@@ -1,0 +1,1243 @@
+// SocialPilot AI — database schema
+//
+// Tenancy: every tenant-owned row carries `organizationId`, and every
+// client-owned row also carries `clientId`. Services always filter on both
+// (see packages/core/src/context.ts). Never query tenant data without them.
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [vector]
+}
+
+// ───────────────────────────── Enums ─────────────────────────────
+
+enum RoleKey {
+  SUPER_ADMIN
+  ORG_OWNER
+  ORG_ADMIN
+  MANAGER
+  CONTENT_MANAGER
+  SOCIAL_MEDIA_MANAGER
+  CLIENT
+  APPROVER
+  VIEWER
+}
+
+enum ClientAccess {
+  ALL
+  ASSIGNED
+}
+
+enum Plan {
+  FREE
+  STARTER
+  PRO
+  AGENCY
+  ENTERPRISE
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  NONE
+}
+
+enum Platform {
+  FACEBOOK
+  INSTAGRAM
+  WHATSAPP
+  LINKEDIN
+  TIKTOK
+  YOUTUBE
+  X
+  PINTEREST
+  GOOGLE_BUSINESS
+  THREADS
+}
+
+enum SocialAccountStatus {
+  ACTIVE
+  TOKEN_EXPIRED
+  REAUTH_REQUIRED
+  DISCONNECTED
+  ERROR
+}
+
+enum ClientStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum ContentStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  SCHEDULED
+  PUBLISHING
+  PUBLISHED
+  FAILED
+  CANCELLED
+}
+
+enum ContentType {
+  POST
+  IMAGE
+  VIDEO
+  CAROUSEL
+  STORY
+  REEL
+  ARTICLE
+  TEXT
+}
+
+enum MediaKind {
+  IMAGE
+  VIDEO
+  DOCUMENT
+}
+
+enum ScheduledPostStatus {
+  SCHEDULED
+  QUEUED
+  PUBLISHING
+  PUBLISHED
+  FAILED
+  CANCELLED
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CHANGES_REQUESTED
+  CANCELLED
+}
+
+enum ConversationType {
+  DIRECT_MESSAGE
+  COMMENT
+}
+
+enum ConversationStatus {
+  OPEN
+  PENDING
+  ESCALATED
+  RESOLVED
+  SPAM
+}
+
+enum ConversationMode {
+  AI
+  HUMAN
+}
+
+enum Priority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum MessageDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum SenderType {
+  CONTACT
+  USER
+  AI
+  SYSTEM
+}
+
+enum MessageStatus {
+  RECEIVED
+  DRAFT
+  PENDING
+  SENT
+  FAILED
+}
+
+enum Intent {
+  GENERAL_QUESTION
+  PRICE
+  PRODUCT_INFO
+  SERVICE_INFO
+  AVAILABILITY
+  LOCATION
+  HOURS
+  BOOKING
+  QUOTE_REQUEST
+  LEAD
+  COMPLAINT
+  REFUND
+  LEGAL
+  CONTRACT
+  SPAM
+  ABUSE
+  HUMAN_REQUEST
+  OTHER
+}
+
+enum ReplyDecision {
+  AUTO_SENT
+  PENDING_APPROVAL
+  ESCALATED
+  APPROVED
+  SENT
+  REJECTED
+  DISCARDED
+  QUEUED_AFTER_HOURS
+  SKIPPED
+}
+
+enum EscalationStatus {
+  OPEN
+  RESOLVED
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  APPOINTMENT
+  PROPOSAL
+  WON
+  LOST
+}
+
+enum KnowledgeSourceType {
+  MANUAL
+  FAQ
+  WEBSITE
+  DOCUMENT
+  PDF
+  TEXT
+  PRODUCT
+  SERVICE
+}
+
+enum KnowledgeStatus {
+  PENDING
+  PROCESSING
+  READY
+  FAILED
+}
+
+enum AutomationTrigger {
+  MESSAGE_RECEIVED
+  COMMENT_RECEIVED
+  LEAD_CREATED
+  POST_FAILED
+}
+
+enum NotificationType {
+  NEW_LEAD
+  APPROVAL_REQUIRED
+  POST_FAILED
+  IMPORTANT_MESSAGE
+  AI_ESCALATION
+  TOKEN_EXPIRED
+  INTEGRATION_DISCONNECTED
+  POST_PUBLISHED
+  CONTENT_APPROVED
+  CONTENT_REJECTED
+}
+
+enum EmailStatus {
+  NOT_REQUIRED
+  PENDING
+  SENT
+  FAILED
+}
+
+enum WebhookStatus {
+  RECEIVED
+  PROCESSING
+  PROCESSED
+  FAILED
+  IGNORED
+}
+
+enum AiGenerationStatus {
+  SUCCESS
+  VALIDATION_FAILED
+  ERROR
+}
+
+enum AfterHoursMode {
+  REPLY_NORMALLY
+  SEND_AFTER_HOURS_MESSAGE
+  QUEUE_FOR_BUSINESS_HOURS
+}
+
+enum MetricSource {
+  PLATFORM_API
+  INTERNAL
+  MOCK
+}
+
+// ───────────────────────────── Identity & tenancy ─────────────────────────────
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  name         String
+  passwordHash String?
+  isSuperAdmin Boolean   @default(false)
+  avatarUrl    String?
+  lastLoginAt  DateTime?
+  disabledAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  sessions      Session[]
+  memberships   OrganizationMember[]
+  notifications Notification[]
+  auditLogs     AuditLog[]
+}
+
+model Session {
+  id         String    @id @default(cuid())
+  userId     String
+  tokenHash  String    @unique
+  userAgent  String?
+  ip         String?
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  lastUsedAt DateTime  @default(now())
+  createdAt  DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Organization {
+  id                 String             @id @default(cuid())
+  name               String
+  slug               String             @unique
+  plan               Plan               @default(FREE)
+  subscriptionStatus SubscriptionStatus @default(TRIALING)
+  /// Plan limits override, e.g. {"clients":5,"socialAccounts":20,"aiGenerations":1000}
+  limits             Json               @default("{}")
+  onboardingStep     String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  members     OrganizationMember[]
+  invitations Invitation[]
+  clients     Client[]
+  usage       UsageCounter[]
+}
+
+model OrganizationMember {
+  id             String       @id @default(cuid())
+  organizationId String
+  userId         String
+  role           RoleKey
+  clientAccess   ClientAccess @default(ALL)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clients      ClientMember[]
+
+  @@unique([organizationId, userId])
+  @@index([userId])
+}
+
+/// Explicit client assignment for members with clientAccess = ASSIGNED.
+model ClientMember {
+  id        String   @id @default(cuid())
+  memberId  String
+  clientId  String
+  createdAt DateTime @default(now())
+
+  member OrganizationMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  client Client             @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([memberId, clientId])
+  @@index([clientId])
+}
+
+model Invitation {
+  id             String       @id @default(cuid())
+  organizationId String
+  email          String
+  role           RoleKey
+  tokenHash      String       @unique
+  invitedById    String
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  createdAt      DateTime     @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([email])
+}
+
+/// Reference data mirrored from the code-level permission matrix
+/// (packages/auth/src/rbac.ts is the source of truth; seeded on deploy).
+model Role {
+  id          String           @id @default(cuid())
+  key         RoleKey          @unique
+  name        String
+  description String?
+  isSystem    Boolean          @default(true)
+  permissions RolePermission[]
+}
+
+model Permission {
+  id          String           @id @default(cuid())
+  key         String           @unique
+  description String?
+  roles       RolePermission[]
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+}
+
+model UsageCounter {
+  id             String   @id @default(cuid())
+  organizationId String
+  metric         String
+  /// YYYY-MM
+  period         String
+  count          Int      @default(0)
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, metric, period])
+}
+
+// ───────────────────────────── Clients ─────────────────────────────
+
+model Client {
+  id             String       @id @default(cuid())
+  organizationId String
+  name           String
+  slug           String
+  status         ClientStatus @default(ACTIVE)
+  timezone       String       @default("UTC")
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  organization     Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  brandProfile     BrandProfile?
+  settings         ClientSettings?
+  members          ClientMember[]
+  socialAccounts   SocialAccount[]
+  campaigns        Campaign[]
+  contents         Content[]
+  conversations    Conversation[]
+  contacts         Contact[]
+  leads            Lead[]
+  knowledgeSources KnowledgeSource[]
+  automationRules  AutomationRule[]
+  media            MediaAsset[]
+
+  @@unique([organizationId, slug])
+  @@index([organizationId, status])
+}
+
+model BrandProfile {
+  id                String   @id @default(cuid())
+  clientId          String   @unique
+  organizationId    String
+  brandName         String
+  industry          String?
+  description       String?
+  tone              String?
+  targetAudience    String?
+  services          String[] @default([])
+  products          String[] @default([])
+  location          String?
+  website           String?
+  phone             String?
+  email             String?
+  brandRules        String[] @default([])
+  forbiddenTopics   String[] @default([])
+  preferredHashtags String[] @default([])
+  cta               String?
+  updatedAt         DateTime @updatedAt
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}
+
+model ClientSettings {
+  id                    String         @id @default(cuid())
+  clientId              String         @unique
+  organizationId        String
+  aiEnabled             Boolean        @default(true)
+  autoReplyEnabled      Boolean        @default(false)
+  autoPublishEnabled    Boolean        @default(false)
+  humanApprovalRequired Boolean        @default(true)
+  defaultTone           String?
+  defaultLanguage       String         @default("en")
+  defaultCta            String?
+  /// confidence >= autoReplyThreshold → eligible for automatic reply
+  autoReplyThreshold    Float          @default(0.9)
+  /// approvalThreshold <= confidence < autoReplyThreshold → approval required; below → escalate
+  approvalThreshold     Float          @default(0.7)
+  allowedAutoIntents    Intent[]       @default([GENERAL_QUESTION, PRODUCT_INFO, SERVICE_INFO, LOCATION, HOURS, AVAILABILITY])
+  escalationIntents     Intent[]       @default([LEGAL, COMPLAINT, REFUND, CONTRACT, ABUSE, HUMAN_REQUEST])
+  /// {"monday":[{"start":"09:00","end":"18:00"}], ...} in client timezone
+  businessHours         Json           @default("{}")
+  afterHoursMode        AfterHoursMode @default(REPLY_NORMALLY)
+  afterHoursMessage     String?
+  maxPublishAttempts    Int?
+  updatedAt             DateTime       @updatedAt
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}
+
+// ───────────────────────────── Social accounts ─────────────────────────────
+
+model SocialAccount {
+  id                String              @id @default(cuid())
+  organizationId    String
+  clientId          String
+  platform          Platform
+  /// true for development Mock* adapters — never valid in production
+  isMock            Boolean             @default(false)
+  platformAccountId String
+  platformUserId    String?
+  displayName       String
+  username          String?
+  avatarUrl         String?
+  status            SocialAccountStatus @default(ACTIVE)
+  capabilities      Json                @default("{}")
+  scopes            String[]            @default([])
+  /// Platform-specific non-secret metadata (e.g. page id, phone number id)
+  metadata          Json                @default("{}")
+  lastSyncedAt      DateTime?
+  lastError         String?
+  connectedById     String?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  client         Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  token          SocialToken?
+  profile        SocialProfile?
+  scheduledPosts ScheduledPost[]
+  publishedPosts PublishedPost[]
+  conversations  Conversation[]
+  comments       Comment[]
+  analytics      AnalyticsSnapshot[]
+
+  @@unique([clientId, platform, platformAccountId])
+  @@index([organizationId])
+  @@index([clientId])
+  @@index([platform, platformAccountId])
+  @@index([status])
+}
+
+/// Encrypted credentials (AES-256-GCM). Never returned by any API.
+model SocialToken {
+  id               String    @id @default(cuid())
+  socialAccountId  String    @unique
+  accessTokenEnc   String
+  refreshTokenEnc  String?
+  tokenType        String    @default("bearer")
+  expiresAt        DateTime?
+  refreshExpiresAt DateTime?
+  scopes           String[]  @default([])
+  keyVersion       Int
+  rotatedAt        DateTime?
+  revokedAt        DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  socialAccount SocialAccount @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+}
+
+model SocialProfile {
+  id              String   @id @default(cuid())
+  socialAccountId String   @unique
+  followers       Int?
+  following       Int?
+  postsCount      Int?
+  bio             String?
+  profileUrl      String?
+  fetchedAt       DateTime @default(now())
+
+  socialAccount SocialAccount @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
+}
+
+/// Single-use OAuth state (CSRF protection + PKCE verifier), short-lived.
+model OAuthState {
+  id             String    @id
+  organizationId String
+  clientId       String
+  userId         String
+  platform       Platform
+  /// true when the flow targets a development Mock* adapter
+  isMock         Boolean   @default(false)
+  codeVerifier   String?
+  redirectPath   String?
+  expiresAt      DateTime
+  usedAt         DateTime?
+  createdAt      DateTime  @default(now())
+
+  @@index([expiresAt])
+}
+
+// ───────────────────────────── Content ─────────────────────────────
+
+model Campaign {
+  id             String    @id @default(cuid())
+  organizationId String
+  clientId       String
+  name           String
+  goal           String?
+  startsAt       DateTime?
+  endsAt         DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  client   Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  contents Content[]
+
+  @@index([organizationId])
+  @@index([clientId])
+}
+
+model Content {
+  id              String        @id @default(cuid())
+  organizationId  String
+  clientId        String
+  campaignId      String?
+  title           String
+  topic           String?
+  objective       String?
+  contentType     ContentType   @default(POST)
+  baseContent     String
+  status          ContentStatus @default(DRAFT)
+  aiGenerated     Boolean       @default(false)
+  aiGenerationId  String?
+  /// Facts the AI needed but the brand profile did not provide
+  missingInfo     String[]      @default([])
+  rejectionReason String?
+  createdById     String
+  approvedById    String?
+  approvedAt      DateTime?
+  scheduledAt     DateTime?
+  deletedAt       DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  client         Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  campaign       Campaign?        @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  variants       ContentVariant[]
+  approvals      Approval[]
+  scheduledPosts ScheduledPost[]
+
+  @@index([organizationId])
+  @@index([clientId, status])
+  @@index([clientId, scheduledAt])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model ContentVariant {
+  id                String        @id @default(cuid())
+  organizationId    String
+  clientId          String
+  contentId         String
+  platform          Platform
+  socialAccountId   String?
+  title             String?
+  caption           String
+  hashtags          String[]      @default([])
+  callToAction      String?
+  mediaType         String?
+  mediaPrompt       String?
+  mediaRequirements Json          @default("{}")
+  status            ContentStatus @default(DRAFT)
+  validationErrors  Json          @default("[]")
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  content        Content         @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  media          VariantMedia[]
+  scheduledPosts ScheduledPost[]
+
+  @@index([contentId])
+  @@index([clientId])
+  @@index([organizationId])
+}
+
+model MediaAsset {
+  id             String    @id @default(cuid())
+  organizationId String
+  clientId       String
+  kind           MediaKind
+  storageKey     String    @unique
+  url            String
+  fileName       String
+  mimeType       String
+  size           Int
+  width          Int?
+  height         Int?
+  durationSec    Float?
+  uploadedById   String?
+  createdAt      DateTime  @default(now())
+
+  client   Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  variants VariantMedia[]
+
+  @@index([organizationId])
+  @@index([clientId, createdAt])
+}
+
+model VariantMedia {
+  variantId String
+  mediaId   String
+  position  Int    @default(0)
+
+  variant ContentVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  media   MediaAsset     @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+
+  @@id([variantId, mediaId])
+}
+
+model Approval {
+  id             String         @id @default(cuid())
+  organizationId String
+  clientId       String
+  contentId      String
+  requestedById  String
+  reviewerId     String?
+  status         ApprovalStatus @default(PENDING)
+  comment        String?
+  decidedAt      DateTime?
+  createdAt      DateTime       @default(now())
+
+  content Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, status])
+  @@index([clientId, status])
+  @@index([contentId])
+}
+
+model ScheduledPost {
+  id              String              @id @default(cuid())
+  organizationId  String
+  clientId        String
+  contentId       String
+  variantId       String
+  socialAccountId String
+  scheduledAt     DateTime
+  status          ScheduledPostStatus @default(SCHEDULED)
+  attempts        Int                 @default(0)
+  maxAttempts     Int                 @default(3)
+  lastError       String?
+  lastErrorCode   String?
+  /// Unique per (variant, account, schedule) — prevents duplicate publishing
+  idempotencyKey  String              @unique
+  jobId           String?
+  publishingAt    DateTime?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  content       Content        @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  variant       ContentVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  socialAccount SocialAccount  @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
+  publishedPost PublishedPost?
+
+  @@index([organizationId])
+  @@index([clientId, scheduledAt])
+  @@index([status, scheduledAt])
+  @@index([socialAccountId])
+}
+
+model PublishedPost {
+  id              String   @id @default(cuid())
+  organizationId  String
+  clientId        String
+  scheduledPostId String   @unique
+  socialAccountId String
+  platform        Platform
+  platformPostId  String
+  url             String?
+  publishedAt     DateTime @default(now())
+
+  scheduledPost ScheduledPost       @relation(fields: [scheduledPostId], references: [id], onDelete: Cascade)
+  socialAccount SocialAccount       @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
+  comments      Comment[]
+  analytics     AnalyticsSnapshot[]
+
+  @@unique([socialAccountId, platformPostId])
+  @@index([organizationId])
+  @@index([clientId, publishedAt])
+}
+
+// ───────────────────────────── Inbox ─────────────────────────────
+
+model Contact {
+  id             String   @id @default(cuid())
+  organizationId String
+  clientId       String
+  platform       Platform
+  platformUserId String?
+  name           String?
+  username       String?
+  email          String?
+  phone          String?
+  avatarUrl      String?
+  notes          String?
+  tags           String[] @default([])
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  client        Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  conversations Conversation[]
+  leads         Lead[]
+
+  @@unique([clientId, platform, platformUserId])
+  @@index([organizationId])
+  @@index([clientId, createdAt])
+}
+
+model Conversation {
+  id                     String             @id @default(cuid())
+  organizationId         String
+  clientId               String
+  socialAccountId        String
+  contactId              String
+  platform               Platform
+  type                   ConversationType
+  platformConversationId String
+  /// For comment threads: the platform post the comment belongs to
+  platformPostId         String?
+  status                 ConversationStatus @default(OPEN)
+  mode                   ConversationMode   @default(AI)
+  priority               Priority           @default(NORMAL)
+  unreadCount            Int                @default(0)
+  lastMessageAt          DateTime           @default(now())
+  lastMessagePreview     String?
+  lastIntent             Intent?
+  lastConfidence         Float?
+  assignedToId           String?
+  /// Rolling AI summary of older messages (conversation memory)
+  summary                String?
+  summaryMessageCount    Int                @default(0)
+  summaryUpdatedAt       DateTime?
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+
+  client        Client              @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  socialAccount SocialAccount       @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
+  contact       Contact             @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  messages      Message[]
+  suggestions   AiReplySuggestion[]
+  escalations   Escalation[]
+  leads         Lead[]
+
+  @@unique([socialAccountId, platformConversationId])
+  @@index([organizationId])
+  @@index([clientId, status, lastMessageAt])
+  @@index([clientId, lastMessageAt])
+  @@index([assignedToId])
+}
+
+model Message {
+  id                String           @id @default(cuid())
+  organizationId    String
+  clientId          String
+  conversationId    String
+  direction         MessageDirection
+  senderType        SenderType
+  platformMessageId String?
+  content           String
+  attachments       Json             @default("[]")
+  status            MessageStatus    @default(RECEIVED)
+  intent            Intent?
+  confidence        Float?
+  isSpam            Boolean          @default(false)
+  sentById          String?
+  sentAt            DateTime?
+  error             String?
+  createdAt         DateTime         @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  comment      Comment?
+
+  @@unique([conversationId, platformMessageId])
+  @@index([conversationId, createdAt])
+  @@index([organizationId])
+  @@index([clientId, createdAt])
+}
+
+model Comment {
+  id                      String   @id @default(cuid())
+  organizationId          String
+  clientId                String
+  socialAccountId         String
+  messageId               String?  @unique
+  publishedPostId         String?
+  platformPostId          String
+  platformCommentId       String
+  parentPlatformCommentId String?
+  authorPlatformId        String?
+  authorName              String?
+  content                 String
+  isHidden                Boolean  @default(false)
+  createdAt               DateTime @default(now())
+
+  socialAccount SocialAccount  @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
+  message       Message?       @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  publishedPost PublishedPost? @relation(fields: [publishedPostId], references: [id], onDelete: SetNull)
+
+  @@unique([socialAccountId, platformCommentId])
+  @@index([organizationId])
+  @@index([clientId, createdAt])
+}
+
+model AiReplySuggestion {
+  id                String        @id @default(cuid())
+  organizationId    String
+  clientId          String
+  conversationId    String
+  inboundMessageId  String
+  suggestedReply    String
+  intent            Intent
+  confidence        Float
+  requiresHuman     Boolean
+  reason            String
+  decision          ReplyDecision
+  decisionReason    String?
+  knowledgeChunkIds String[]      @default([])
+  aiGenerationId    String?
+  sentMessageId     String?
+  decidedById       String?
+  decidedAt         DateTime?
+  createdAt         DateTime      @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@unique([inboundMessageId])
+  @@index([conversationId])
+  @@index([clientId, decision])
+  @@index([organizationId])
+}
+
+model Escalation {
+  id             String           @id @default(cuid())
+  organizationId String
+  clientId       String
+  conversationId String
+  messageId      String?
+  reason         String
+  intent         Intent?
+  status         EscalationStatus @default(OPEN)
+  assignedToId   String?
+  resolvedById   String?
+  resolvedAt     DateTime?
+  createdAt      DateTime         @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([clientId, status])
+  @@index([organizationId, status])
+  @@index([conversationId])
+}
+
+// ───────────────────────────── CRM ─────────────────────────────
+
+model Lead {
+  id              String     @id @default(cuid())
+  organizationId  String
+  clientId        String
+  contactId       String?
+  conversationId  String?
+  name            String?
+  username        String?
+  platform        Platform?
+  source          String
+  email           String?
+  phone           String?
+  interest        String?
+  intent          Intent?
+  confidence      Float?
+  status          LeadStatus @default(NEW)
+  value           Float?
+  assignedToId    String?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  client       Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  contact      Contact?      @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  conversation Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  notes        LeadNote[]
+
+  @@index([organizationId])
+  @@index([clientId, status])
+  @@index([clientId, createdAt])
+  @@index([conversationId])
+  @@index([assignedToId])
+}
+
+model LeadNote {
+  id        String   @id @default(cuid())
+  leadId    String
+  authorId  String
+  body      String
+  createdAt DateTime @default(now())
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId, createdAt])
+}
+
+// ───────────────────────────── Knowledge base ─────────────────────────────
+
+model KnowledgeSource {
+  id             String              @id @default(cuid())
+  organizationId String
+  clientId       String
+  type           KnowledgeSourceType
+  title          String
+  /// Raw text for MANUAL / FAQ / TEXT sources and extracted text for files
+  content        String?
+  url            String?
+  mediaId        String?
+  status         KnowledgeStatus     @default(PENDING)
+  error          String?
+  chunkCount     Int                 @default(0)
+  createdById    String?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  client Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  chunks KnowledgeChunk[]
+
+  @@index([organizationId])
+  @@index([clientId, status])
+}
+
+model KnowledgeChunk {
+  id             String                       @id @default(cuid())
+  organizationId String
+  clientId       String
+  sourceId       String
+  index          Int
+  content        String
+  tokenCount     Int
+  embeddingModel String
+  embedding      Unsupported("vector(1536)")?
+  createdAt      DateTime                     @default(now())
+
+  source KnowledgeSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@index([organizationId])
+  @@index([sourceId])
+}
+
+// ───────────────────────────── Automation ─────────────────────────────
+
+model AutomationRule {
+  id             String            @id @default(cuid())
+  organizationId String
+  /// null = applies to every client in the organization
+  clientId       String?
+  name           String
+  description    String?
+  enabled        Boolean           @default(true)
+  priority       Int               @default(100)
+  trigger        AutomationTrigger
+  platforms      Platform[]        @default([])
+  /// Validated by automationConditionsSchema (packages/validation)
+  conditions     Json              @default("[]")
+  /// Validated by automationActionsSchema (packages/validation)
+  actions        Json              @default("[]")
+  stopProcessing Boolean           @default(false)
+  createdById    String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  client     Client?               @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  executions AutomationExecution[]
+
+  @@index([organizationId, trigger, enabled])
+  @@index([clientId])
+}
+
+model AutomationExecution {
+  id             String            @id @default(cuid())
+  organizationId String
+  clientId       String
+  ruleId         String
+  trigger        AutomationTrigger
+  resourceType   String
+  resourceId     String
+  matched        Boolean
+  actions        Json              @default("[]")
+  error          String?
+  createdAt      DateTime          @default(now())
+
+  rule AutomationRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+
+  @@index([ruleId, createdAt])
+  @@index([clientId, createdAt])
+}
+
+// ───────────────────────────── Notifications ─────────────────────────────
+
+model Notification {
+  id             String           @id @default(cuid())
+  organizationId String
+  userId         String
+  clientId       String?
+  type           NotificationType
+  title          String
+  body           String?
+  link           String?
+  data           Json             @default("{}")
+  readAt         DateTime?
+  emailStatus    EmailStatus      @default(NOT_REQUIRED)
+  createdAt      DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt, createdAt])
+  @@index([organizationId])
+}
+
+// ───────────────────────────── Analytics ─────────────────────────────
+
+/// Append-only metric snapshots. One row per (account, scope, metric, date).
+model AnalyticsSnapshot {
+  id              String       @id @default(cuid())
+  organizationId  String
+  clientId        String
+  socialAccountId String
+  publishedPostId String?
+  /// "account" or the published post id — makes the unique key null-safe
+  scopeKey        String
+  platform        Platform
+  metric          String
+  value           Float
+  date            DateTime     @db.Date
+  source          MetricSource
+  capturedAt      DateTime     @default(now())
+
+  socialAccount SocialAccount  @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
+  publishedPost PublishedPost? @relation(fields: [publishedPostId], references: [id], onDelete: Cascade)
+
+  @@unique([socialAccountId, scopeKey, metric, date])
+  @@index([clientId, date])
+  @@index([organizationId, date])
+  @@index([publishedPostId])
+}
+
+model AnalyticsReport {
+  id             String   @id @default(cuid())
+  organizationId String
+  clientId       String
+  periodStart    DateTime
+  periodEnd      DateTime
+  metrics        Json
+  summary        Json
+  aiGenerationId String?
+  createdById    String?
+  createdAt      DateTime @default(now())
+
+  @@index([clientId, createdAt])
+}
+
+// ───────────────────────────── AI, audit, webhooks ─────────────────────────────
+
+model AiGeneration {
+  id             String             @id @default(cuid())
+  organizationId String?
+  clientId       String?
+  userId         String?
+  provider       String
+  model          String
+  agent          String
+  promptVersion  String
+  inputType      String
+  output         Json?
+  latencyMs      Int
+  inputTokens    Int?
+  outputTokens   Int?
+  status         AiGenerationStatus
+  error          String?
+  createdAt      DateTime           @default(now())
+
+  @@index([organizationId, createdAt])
+  @@index([clientId, createdAt])
+  @@index([agent, createdAt])
+}
+
+model AuditLog {
+  id             String   @id @default(cuid())
+  organizationId String?
+  clientId       String?
+  userId         String?
+  action         String
+  resourceType   String
+  resourceId     String?
+  before         Json?
+  after          Json?
+  ip             String?
+  userAgent      String?
+  requestId      String?
+  createdAt      DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+  @@index([clientId, createdAt])
+  @@index([resourceType, resourceId])
+  @@index([userId])
+}
+
+model WebhookEvent {
+  id              String        @id @default(cuid())
+  platform        Platform
+  /// Idempotency key: platform-provided event id or a hash of the payload
+  eventKey        String        @unique
+  eventType       String
+  socialAccountId String?
+  organizationId  String?
+  clientId        String?
+  payload         Json
+  status          WebhookStatus @default(RECEIVED)
+  attempts        Int           @default(0)
+  error           String?
+  receivedAt      DateTime      @default(now())
+  processedAt     DateTime?
+
+  @@index([status, receivedAt])
+  @@index([socialAccountId])
+  @@index([organizationId, receivedAt])
+}
