@@ -1,0 +1,22 @@
+{
+  "name": "@socialpilot/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": { "typecheck": "tsc -p tsconfig.json" },
+  "dependencies": {
+    "@socialpilot/ai": "0.1.0",
+    "@socialpilot/auth": "0.1.0",
+    "@socialpilot/config": "0.1.0",
+    "@socialpilot/database": "0.1.0",
+    "@socialpilot/social": "0.1.0",
+    "@socialpilot/storage": "0.1.0",
+    "@socialpilot/validation": "0.1.0",
+    "bullmq": "5.81.5",
+    "ioredis": "5.11.1",
+    "pdf-parse": "2.4.5",
+    "pino": "10.3.1",
+    "zod": "4.6.5"
+  }
+}

@@ -14,7 +14,7 @@ next-env.d.ts
 
 # local storage driver
 .data/
-storage/
+/storage/
 
 # test artifacts
 playwright-report/
