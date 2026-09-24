@@ -1,0 +1,18 @@
+{
+  "name": "@socialpilot/worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "SERVICE_NAME=worker tsx watch --clear-screen=false src/main.ts",
+    "build": "tsup",
+    "start": "SERVICE_NAME=worker node dist/main.js",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@socialpilot/config": "0.1.0",
+    "@socialpilot/core": "0.1.0",
+    "@socialpilot/database": "0.1.0",
+    "bullmq": "5.81.5"
+  }
+}
