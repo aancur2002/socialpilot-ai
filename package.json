@@ -1,0 +1,51 @@
+{
+  "name": "socialpilot-ai",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "npm@11.16.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev --parallel",
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "lint": "eslint . --max-warnings=0",
+    "test": "vitest run --project unit",
+    "test:integration": "vitest run --project integration",
+    "test:all": "vitest run",
+    "test:e2e": "npm run test:e2e --workspace @socialpilot/web",
+    "db:generate": "npm run generate --workspace @socialpilot/database",
+    "db:migrate": "npm run migrate:dev --workspace @socialpilot/database",
+    "db:deploy": "npm run migrate:deploy --workspace @socialpilot/database",
+    "db:seed": "npm run seed --workspace @socialpilot/database",
+    "db:reset": "npm run reset --workspace @socialpilot/database",
+    "infra:up": "docker compose up -d postgres redis",
+    "infra:down": "docker compose down",
+    "postinstall": "npm run db:generate"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.5",
+    "@types/node": "22.20.4",
+    "eslint": "9.39.5",
+    "globals": "17.12.0",
+    "tsup": "8.5.1",
+    "tsx": "4.23.15",
+    "turbo": "2.11.3",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.70.1",
+    "vitest": "3.2.7"
+  },
+  "allowScripts": {
+    "esbuild@0.27.7": true,
+    "esbuild@0.28.2": true,
+    "prisma@6.19.3": true,
+    "@prisma/client@6.19.3": true,
+    "@prisma/engines@6.19.3": true
+  }
+}

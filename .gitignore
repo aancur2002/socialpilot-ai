@@ -1,0 +1,26 @@
+node_modules/
+dist/
+.next/
+out/
+coverage/
+.turbo/
+*.tsbuildinfo
+next-env.d.ts
+
+# env — never commit real secrets
+.env
+.env.*
+!.env.example
+
+# local storage driver
+.data/
+storage/
+
+# test artifacts
+playwright-report/
+test-results/
+blob-report/
+
+.DS_Store
+*.log
+local.env

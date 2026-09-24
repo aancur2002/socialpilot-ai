@@ -1,0 +1,83 @@
+name: socialpilot
+
+# Local development stack.
+#   docker compose up -d postgres redis      # infra only (run apps with `npm run dev`)
+#   docker compose --profile apps up --build # everything in containers
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: socialpilot
+      POSTGRES_PASSWORD: socialpilot
+      POSTGRES_DB: socialpilot
+    ports:
+      - "5434:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U socialpilot -d socialpilot"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6380:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    profiles: ["apps"]
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile
+      target: api
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://socialpilot:socialpilot@postgres:5432/socialpilot?schema=public
+      REDIS_URL: redis://redis:6379
+    ports:
+      - "4000:4000"
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  worker:
+    profiles: ["apps"]
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile
+      target: worker
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://socialpilot:socialpilot@postgres:5432/socialpilot?schema=public
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  web:
+    profiles: ["apps"]
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile
+      target: web
+    environment:
+      API_URL: http://api:4000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+
+volumes:
+  pgdata:
+  redisdata:
