@@ -1,0 +1,12 @@
+{
+  "name": "@socialpilot/social",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": { "typecheck": "tsc -p tsconfig.json" },
+  "dependencies": {
+    "@socialpilot/auth": "0.1.0",
+    "@socialpilot/validation": "0.1.0"
+  }
+}

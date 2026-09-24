@@ -1,0 +1,13 @@
+export * from './types';
+export * from './errors';
+export * from './http';
+export * from './capabilities';
+export * from './validation';
+export * from './registry';
+export { BaseAdapter } from './adapters/base';
+export { FacebookAdapter, parseFacebookWebhook } from './adapters/facebook';
+export { InstagramAdapter, parseInstagramWebhook } from './adapters/instagram';
+export { WhatsAppAdapter, parseWhatsAppWebhook } from './adapters/whatsapp';
+export { LinkedInAdapter } from './adapters/linkedin';
+export { TikTokAdapter } from './adapters/tiktok';
+export { MockSocialAdapter, MOCK_FAILURE_MARKERS, signMockWebhook, parseMockWebhook, type MockWebhookPayload } from './mock/mock-adapter';
