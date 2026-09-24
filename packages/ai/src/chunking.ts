@@ -9,11 +9,11 @@ export interface Chunk {
 
 /**
  * Splits text into overlapping chunks on paragraph → sentence boundaries.
- * Defaults (~500 tokens, ~60 overlap) suit FAQ/product text for retrieval.
+ * Defaults (~300 tokens, ~40 overlap) keep FAQ/product chunks focused for retrieval.
  */
 export function chunkText(text: string, opts: { maxTokens?: number; overlapTokens?: number } = {}): Chunk[] {
-  const maxChars = (opts.maxTokens ?? 500) * 4;
-  const overlapChars = (opts.overlapTokens ?? 60) * 4;
+  const maxChars = (opts.maxTokens ?? 300) * 4;
+  const overlapChars = (opts.overlapTokens ?? 40) * 4;
   const normalized = text.replace(/\r\n/g, '\n').replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
   if (!normalized) return [];
 

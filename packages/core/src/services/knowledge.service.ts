@@ -131,7 +131,7 @@ export interface KnowledgeHit {
  * Semantic search restricted to ONE client. The client filter is part of the SQL,
  * so knowledge can never be retrieved across tenants.
  */
-export async function searchKnowledgeInternal(organizationId: string, clientId: string, query: string, limit = 5, minScore = 0.1): Promise<KnowledgeHit[]> {
+export async function searchKnowledgeInternal(organizationId: string, clientId: string, query: string, limit = 5, minScore = 0): Promise<KnowledgeHit[]> {
   const { db, embeddings } = getInfra();
   const [vector] = await embeddings.generateEmbeddings([query]);
   if (!vector) return [];

@@ -103,6 +103,20 @@ async function applySideEffects(conversation: { id: string; organizationId: stri
  *   auto-send | approval | escalation
  */
 export async function processInboundMessage(messageId: string, opts: { force?: boolean; requestedBy?: AuthContext } = {}): Promise<PipelineResult> {
+  // One pipeline per message at a time (webhook retries, regenerate clicks and workers can overlap).
+  const { redis } = getInfra();
+  const lockKey = `socialpilot:lock:reply:${messageId}`;
+  const token = `${process.pid}:${Date.now()}:${Math.random()}`;
+  if ((await redis.set(lockKey, token, 'PX', 180_000, 'NX')) !== 'OK') return { decision: 'ALREADY_PROCESSED' };
+  try {
+    return await runPipeline(messageId, opts);
+  } finally {
+    // Release only our own lock.
+    await redis.eval("if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end", 1, lockKey, token).catch(() => undefined);
+  }
+}
+
+async function runPipeline(messageId: string, opts: { force?: boolean; requestedBy?: AuthContext }): Promise<PipelineResult> {
   const { db, ai, logger } = getInfra();
   const message = await db.message.findUnique({
     where: { id: messageId },

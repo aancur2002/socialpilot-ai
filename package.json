@@ -23,11 +23,12 @@
     "db:generate": "npm run generate --workspace @socialpilot/database",
     "db:migrate": "npm run migrate:dev --workspace @socialpilot/database",
     "db:deploy": "npm run migrate:deploy --workspace @socialpilot/database",
-    "db:seed": "npm run seed --workspace @socialpilot/database",
+    "db:seed": "tsx packages/core/scripts/seed.ts",
     "db:reset": "npm run reset --workspace @socialpilot/database",
     "infra:up": "docker compose up -d postgres redis",
     "infra:down": "docker compose down",
-    "postinstall": "npm run db:generate"
+    "postinstall": "npm run db:generate",
+    "db:migrate:new": "npm run migrate:new --workspace @socialpilot/database --"
   },
   "devDependencies": {
     "@eslint/js": "9.39.5",
