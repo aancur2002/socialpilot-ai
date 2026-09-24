@@ -1,7 +1,7 @@
 import { isValidTimezone } from '@socialpilot/ai';
 import { isUniqueViolation, type Prisma } from '@socialpilot/database';
 import type { BrandProfileInput, ClientSettingsInput } from '@socialpilot/validation';
-import { assertClientAccess, requirePermission, tenantWhere, type AuthContext, type ServiceContext } from '../context';
+import { assertClientAccess, requirePermission, type AuthContext, type ServiceContext } from '../context';
 import { badRequest, conflict, notFound } from '../errors';
 import { getInfra } from '../infra';
 import { randomSuffix, slugify } from '../lib/util';

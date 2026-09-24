@@ -15,7 +15,7 @@ const TAG_LOOKALIKE = /<\s*\/?\s*(untrusted[\w-]*|trusted[\w-]*|system[\w-]*|ins
 export function sanitizeUntrusted(text: string, maxLength = 8000): string {
   const cleaned = text
     .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
-    .replace(/[​-‏‪-‮⁠-⁤﻿]/g, '')
+    .replace(/[\u200B-\u200F\u202A-\u202E\u2060-\u2064\uFEFF]/g, '')
     .replace(TAG_LOOKALIKE, '[tag removed]');
   return cleaned.length > maxLength ? `${cleaned.slice(0, maxLength)}\n[truncated]` : cleaned;
 }

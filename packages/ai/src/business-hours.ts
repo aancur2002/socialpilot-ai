@@ -1,12 +1,12 @@
 export type BusinessHoursConfig = Partial<Record<'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday', { start: string; end: string }[]>>;
 
-const WEEKDAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const;
+type Weekday = 'sunday' | 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday';
 
 /** Local weekday and HH:MM for an instant in an IANA timezone. */
-export function localTime(date: Date, timezone: string): { day: (typeof WEEKDAYS)[number]; hhmm: string } {
+export function localTime(date: Date, timezone: string): { day: Weekday; hhmm: string } {
   const parts = new Intl.DateTimeFormat('en-US', { timeZone: timezone, weekday: 'long', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(date);
   const get = (type: string) => parts.find((p) => p.type === type)?.value ?? '';
-  const day = get('weekday').toLowerCase() as (typeof WEEKDAYS)[number];
+  const day = get('weekday').toLowerCase() as Weekday;
   return { day, hhmm: `${get('hour').padStart(2, '0')}:${get('minute')}` };
 }
 
