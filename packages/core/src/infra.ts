@@ -72,7 +72,7 @@ export function buildInfra(env: Env = getEnv()): Infra {
       facebook: { clientId: env.FACEBOOK_CLIENT_ID, clientSecret: env.FACEBOOK_CLIENT_SECRET, webhookVerifyToken: env.FACEBOOK_WEBHOOK_VERIFY_TOKEN },
       instagram: { clientId: env.INSTAGRAM_CLIENT_ID, clientSecret: env.INSTAGRAM_CLIENT_SECRET, webhookVerifyToken: env.INSTAGRAM_WEBHOOK_VERIFY_TOKEN },
       whatsapp: { clientId: env.WHATSAPP_CLIENT_ID, clientSecret: env.WHATSAPP_CLIENT_SECRET, webhookVerifyToken: env.WHATSAPP_WEBHOOK_VERIFY_TOKEN, configId: env.WHATSAPP_CONFIG_ID },
-      linkedin: { clientId: env.LINKEDIN_CLIENT_ID, clientSecret: env.LINKEDIN_CLIENT_SECRET, apiVersion: env.LINKEDIN_API_VERSION },
+      linkedin: { clientId: env.LINKEDIN_CLIENT_ID, clientSecret: env.LINKEDIN_CLIENT_SECRET, apiVersion: env.LINKEDIN_API_VERSION, organizationScopes: env.LINKEDIN_ORGANIZATION_SCOPES },
       tiktok: { clientId: env.TIKTOK_CLIENT_KEY, clientSecret: env.TIKTOK_CLIENT_SECRET },
     }),
     queues: new Queues(redis),

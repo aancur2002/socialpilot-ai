@@ -96,6 +96,7 @@ export const envSchema = z
     LINKEDIN_CLIENT_ID: optionalString,
     LINKEDIN_CLIENT_SECRET: optionalString,
     LINKEDIN_API_VERSION: z.string().default('202509'),
+    LINKEDIN_ORGANIZATION_SCOPES: bool,
     TIKTOK_CLIENT_KEY: optionalString,
     TIKTOK_CLIENT_SECRET: optionalString,
 

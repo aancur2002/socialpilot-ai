@@ -99,6 +99,12 @@ export class FacebookAdapter extends BaseAdapter {
         message: 'No Facebook Pages were shared with the app. Re-connect and select at least one Page.',
       });
     }
+    // Subscribe each Page to this app's webhooks so comments and messages are delivered.
+    for (const page of pages.data) {
+      await this.http.post(this.url(`${page.id}/subscribed_apps`), {
+        form: { subscribed_fields: 'feed,messages,messaging_postbacks', access_token: page.access_token },
+      });
+    }
     return pages.data.map((page) => ({
       platformAccountId: page.id,
       platformUserId: me.id,
