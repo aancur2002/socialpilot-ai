@@ -136,8 +136,9 @@ export class MockSocialAdapter implements SocialPlatformAdapter {
 
   async getProfile(account: SocialAccount): Promise<SocialProfile> {
     const rnd = seeded(account.platformAccountId);
+    const stored = typeof account.metadata.displayName === 'string' ? account.metadata.displayName : undefined;
     return {
-      displayName: `${this.name} Account`,
+      displayName: stored ?? `${this.name} Account`,
       username: account.platformAccountId,
       followers: Math.floor(500 + rnd() * 20000),
       following: Math.floor(rnd() * 500),

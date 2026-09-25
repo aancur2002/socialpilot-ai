@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 import { api, errorMessage } from '@/lib/api';
 import { useSession } from '@/lib/session';
 import type { ConversationDetail, ConversationListItem, Member, Paged, SocialAccount } from '@/lib/types';
-import { ago, ConfidenceMeter, humanize, MockBadge, PlatformChip, when } from './domain';
+import { ago, ConfidenceMeter, humanize, MockBadge, PlatformChip, platformName, when } from './domain';
 import { Modal } from './ui/overlay';
 import { Badge, Button, cn, EmptyState, ErrorState, Field, Input, Select, Skeleton, Textarea } from './ui/primitives';
 
@@ -43,7 +43,7 @@ function SimulateInbound({ onDone }: { onDone: () => void }) {
               <option value="">Choose an account</option>
               {mockAccounts.map((a) => (
                 <option key={a.id} value={a.id}>
-                  {a.displayName} ({humanize(a.platform)})
+                  {platformName(a.platform)}: {a.displayName}
                 </option>
               ))}
             </Select>

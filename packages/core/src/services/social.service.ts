@@ -149,7 +149,10 @@ export async function connectMockAccount(ctx: AuthContext, input: { clientId: st
   await getClient(ctx, input.clientId);
   const adapter = getInfra().social.mock(input.platform);
   const accounts = await adapter.handleOAuthCallback({ code: `mock_code_${input.platform}_${generateToken(6)}`, redirectUri: oauthRedirectUri(input.platform) });
-  if (input.displayName) accounts[0]!.displayName = input.displayName;
+  if (input.displayName) {
+    accounts[0]!.displayName = input.displayName;
+    accounts[0]!.metadata = { ...accounts[0]!.metadata, displayName: input.displayName };
+  }
   const [account] = await saveConnectedAccounts(ctx, input.clientId, input.platform, adapter, accounts);
   return getSocialAccount(ctx, account!.id);
 }
