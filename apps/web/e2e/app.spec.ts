@@ -77,3 +77,13 @@ test('permissions: a viewer sees content but cannot create it', async ({ page })
   await expect(page.getByRole('link', { name: 'Automation' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'AI content' })).toHaveCount(0);
 });
+
+test('platform admin: a super admin without memberships lands on the platform console', async ({ page }) => {
+  await page.goto('/login');
+  await page.getByLabel('Email').fill('admin@socialpilot.local');
+  await page.getByLabel('Password').fill(PASSWORD);
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.waitForURL('**/platform-admin');
+  await expect(page.getByRole('heading', { name: 'Platform admin' })).toBeVisible();
+  await expect(page.getByText(/System (ok|degraded)/)).toBeVisible();
+});

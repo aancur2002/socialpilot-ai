@@ -82,10 +82,7 @@ export async function listUserOrganizations(userId: string) {
   return memberships.map((m) => ({ ...m.organization, role: m.role }));
 }
 
-/**
- * Builds the AuthContext for a user acting in an organization. Super admins may
- * enter any organization (read-mostly support access, fully audited).
- */
+/** Builds the AuthContext for a user acting in an organization they belong to. */
 export async function resolveAuthContext(
   user: { id: string; isSuperAdmin: boolean },
   organizationId: string,
@@ -96,12 +93,9 @@ export async function resolveAuthContext(
     where: { organizationId_userId: { organizationId, userId: user.id } },
     include: { clients: { select: { clientId: true } } },
   });
-  if (!member) {
-    if (!user.isSuperAdmin) throw notFound('Organization');
-    const exists = await db.organization.findUnique({ where: { id: organizationId }, select: { id: true } });
-    if (!exists) throw notFound('Organization');
-    return buildAuthContext({ userId: user.id, isSuperAdmin: true, organizationId, role: 'SUPER_ADMIN', clientAccess: 'ALL', assignedClientIds: [], ...meta });
-  }
+  // Membership is required for everyone, including platform super admins: they use the
+  // aggregate /admin views and never browse a tenant's inbox or content implicitly.
+  if (!member) throw notFound('Organization');
   return buildAuthContext({
     userId: user.id,
     isSuperAdmin: user.isSuperAdmin,

@@ -92,6 +92,12 @@ describe('multi-tenant isolation', () => {
     await expect(core.createAutomationRule(ctx, { clientId: clientA.client.id, name: 'r', trigger: 'MESSAGE_RECEIVED', enabled: true, priority: 1, platforms: [], conditions: [], actions: [{ type: 'notify' }], stopProcessing: false })).resolves.toBeTruthy();
   });
 
+  it('does not let platform super admins enter organizations they are not members of', async () => {
+    const { db } = core.getInfra();
+    const admin = await db.user.create({ data: { email: `sa-${Date.now()}@test.local`, name: 'SA', isSuperAdmin: true } });
+    await expect(core.resolveAuthContext({ id: admin.id, isSuperAdmin: true }, a.organizationId)).rejects.toMatchObject({ status: 404 });
+  });
+
   it('prevents role escalation through member management', async () => {
     const { ctx: admin } = await addMember(a.organizationId, 'ORG_ADMIN');
     const { user } = await addMember(a.organizationId, 'VIEWER');

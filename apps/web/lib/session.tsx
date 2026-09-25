@@ -43,7 +43,7 @@ export function SessionProvider({ children, fallback }: { children: ReactNode; f
     if (!me.data) return;
     const orgs = me.data.organizations;
     if (!orgs.length) {
-      router.replace('/onboarding');
+      router.replace(me.data.user.isSuperAdmin ? '/platform-admin' : '/onboarding');
       return;
     }
     const current = getCurrentOrg();

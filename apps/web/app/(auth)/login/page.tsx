@@ -9,6 +9,7 @@ import { useForm } from 'react-hook-form';
 import type { z } from 'zod';
 import { Button, Field, Input } from '@/components/ui/primitives';
 import { api, errorMessage } from '@/lib/api';
+import type { Me } from '@/lib/types';
 
 type Form = z.input<typeof loginSchema>;
 
@@ -21,7 +22,8 @@ export default function LoginPage() {
     setError(null);
     try {
       await api('/auth/login', { body: values });
-      router.replace('/dashboard');
+      const me = await api<Me>('/auth/me');
+      router.replace(me.organizations.length ? '/dashboard' : me.user.isSuperAdmin ? '/platform-admin' : '/onboarding');
     } catch (e) {
       setError(errorMessage(e));
     }

@@ -7,7 +7,7 @@
 - **E**: Playwright browser E2E
 - **M**: manually run against the local stack (including screenshots)
 
-Last full run: `npm run typecheck` ✓ · `npm run lint` ✓ · `npm test` 116 ✓ · `npm run test:integration` 34 ✓ · `npm run build` ✓ · `npm run test:e2e` 3 ✓
+Last full run: `npm run typecheck` passed, `npm run lint` passed, `npm test` 116 passed, `npm run test:integration` 35 passed, `npm run build` passed, `npm run test:e2e` 4 passed (against production builds). The E2E suite also passed against the Docker images.
 
 ## Phase 1: Foundation
 - [x] Monorepo (npm workspaces + Turborepo), strict TypeScript, ESLint (incl. react-hooks). **M**
@@ -27,6 +27,7 @@ Last full run: `npm run typecheck` ✓ · `npm run lint` ✓ · `npm test` 116 �
 - [x] OAuth architecture (single-use state, PKCE, encrypted token storage, refresh, revoke, key rotation). **U**, **I**, **E** (mock flow)
 - [x] Mock providers (MockFacebook, MockInstagram, MockWhatsApp, MockLinkedIn, MockTikTok), refused in production. **U**, **I**, **E**
 - [x] Platform status and capability UI. **M**
+- [x] Platform admin console (aggregate views; super admins need membership to enter a workspace). **I**, **E**
 
 ## Phase 3: Content and AI
 - [x] AI provider abstraction (Anthropic, OpenAI-compatible, mock) and embeddings. **U**
@@ -77,7 +78,7 @@ Adapters are implemented against the official APIs. **None has been run with rea
 ## Phase 10: Production readiness
 - [x] Unit, integration and E2E suites passing. **U**, **I**, **E**
 - [x] API and worker production bundles boot and pass `/ready`. **M**
-- [~] Docker images: Dockerfile with api, worker and web targets (see the final report for build results).
+- [x] Docker images for api, worker and web: built, run on the compose network, `/ready` fully ok, browser E2E passed against the containers. **M**, **E**
 - [x] Demo seed. **M**
 - [x] Documentation (README, architecture, development, deployment, database, AI, security, troubleshooting, integration guides). **M**
 - [ ] CI pipeline configuration

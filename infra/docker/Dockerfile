@@ -40,6 +40,8 @@ COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/package.json ./package.json
 COPY --from=build /app/packages/database/prisma ./packages/database/prisma
 COPY --from=build /app/apps/api/dist ./apps/api/dist
+# Writable directory for the local storage driver (development/compose only; production uses S3).
+RUN mkdir -p /app/.data && chown node:node /app/.data
 USER node
 EXPOSE 4000
 # Applies pending migrations, then serves. Run a single API replica for migrations,
@@ -52,6 +54,7 @@ ENV NODE_ENV=production SERVICE_NAME=worker
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/package.json ./package.json
 COPY --from=build /app/apps/worker/dist ./apps/worker/dist
+RUN mkdir -p /app/.data && chown node:node /app/.data
 USER node
 CMD ["node", "apps/worker/dist/main.js"]
 
