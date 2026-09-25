@@ -207,7 +207,7 @@ Who did what and when: posts, approvals, messages sent, AI replies, settings cha
 Real connections need a developer app on each platform. You create these once, as the operator of this service, and every agency connects through them.
 
 1. **Make the service reachable over HTTPS.** Platforms won't redirect to `localhost`. In `.env`, set `APP_URL`, `API_URL` and `WEBHOOK_BASE_URL` to your public addresses. For testing from your own machine you can use a tunnel, for example `cloudflared tunnel --url http://localhost:4000`.
-2. **Sign in as the platform admin** (`admin@socialpilot.local`) and open **Platform admin → Integrations**.
+2. **Sign in as a platform admin** and open **Platform admin → Integrations**. Use `admin@socialpilot.local`, or give your own login platform admin rights from the server's shell: `npm run platform-admin -- you@example.com` (undo with `--revoke`). Only a platform admin can add these credentials; agency owners see "A platform admin needs to add the … app credentials first."
 3. **For each platform you need:**
    1. Create the developer app. The steps are in `docs/integrations/<platform>.md`.
    2. Copy the **OAuth redirect URI** and **Webhook callback URL** from the card into the app's settings. For Meta, **Generate** a webhook verify token and paste the same value on both sides.

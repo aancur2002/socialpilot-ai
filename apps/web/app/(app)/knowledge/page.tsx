@@ -1,5 +1,6 @@
 'use client';
 
+import { ClientSelect } from '@/components/client-select';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { BookOpen, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import { useRef, useState } from 'react';
@@ -15,7 +16,7 @@ import type { KnowledgeSource, MediaAsset } from '@/lib/types';
 const STATUS_TONE = { READY: 'clearance', PROCESSING: 'sky', PENDING: 'sky', FAILED: 'alert' } as const;
 
 export default function KnowledgePage() {
-  const { clientId, clients, setClientId, can } = useSession();
+  const { clientId, setClientId, can } = useSession();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ type: 'FAQ', title: '', content: '', url: '' });
@@ -55,10 +56,7 @@ export default function KnowledgePage() {
         description="Facts the AI may use when replying: FAQs, prices, policies, documents and web pages. Each client’s knowledge is only ever used for that client."
         actions={
           <>
-            <Select aria-label="Client" className="w-56" value={clientId ?? ''} onChange={(e) => setClientId(e.target.value || null)}>
-              <option value="">Choose a client</option>
-              {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </Select>
+            <ClientSelect aria-label="Client" className="w-56" value={clientId} onChange={setClientId} />
             {can('knowledge:manage') && clientId && <Button onClick={() => setOpen(true)}><Plus className="h-4 w-4" /> Add knowledge</Button>}
           </>
         }

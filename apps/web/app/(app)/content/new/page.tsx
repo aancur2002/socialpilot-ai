@@ -1,5 +1,6 @@
 'use client';
 
+import { ClientSelect } from '@/components/client-select';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Sparkles } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -66,9 +67,7 @@ export default function NewContentPage() {
           </div>
           <div className="space-y-4 p-5">
             <Field label="Client" htmlFor="client">
-              <Select id="client" value={clientId} onChange={(e) => setClientId(e.target.value)}>
-                {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </Select>
+              <ClientSelect id="client" value={clientId || null} onChange={(v) => v && setClientId(v)} />
             </Field>
             {mode === 'ai' ? (
               <>

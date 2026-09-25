@@ -6,6 +6,7 @@ import { Plus } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { ago, humanize, when } from '@/components/domain';
+import { ClientMultiSelect } from '@/components/client-select';
 import { AccountSettings } from '@/components/settings-account';
 import { AiModelSettings } from '@/components/settings-ai';
 import { ConfirmButton, Modal } from '@/components/ui/overlay';
@@ -29,7 +30,6 @@ const ASSIGNABLE = ROLE_KEYS.filter((r) => r !== 'SUPER_ADMIN');
 interface AuditRow { id: string; action: string; resourceType: string; createdAt: string; ip: string | null; user: { name: string; email: string } | null }
 
 function ClientAccessEditor({ member, onClose }: { member: Member; onClose: () => void }) {
-  const { clients } = useSession();
   const qc = useQueryClient();
   const [access, setAccess] = useState<'ALL' | 'ASSIGNED'>(member.clientAccess);
   const [ids, setIds] = useState<string[]>(member.clientIds);
@@ -48,13 +48,8 @@ function ClientAccessEditor({ member, onClose }: { member: Member; onClose: () =
         <label className="flex items-start gap-2"><input type="radio" checked={access === 'ALL'} onChange={() => setAccess('ALL')} /> <span><span className="font-medium">All clients</span><span className="block text-ink-2">Including clients added later.</span></span></label>
         <label className="flex items-start gap-2"><input type="radio" checked={access === 'ASSIGNED'} onChange={() => setAccess('ASSIGNED')} /> <span><span className="font-medium">Only selected clients</span></span></label>
         {access === 'ASSIGNED' && (
-          <div className="grid gap-1 pl-6 sm:grid-cols-2">
-            {clients.map((c) => (
-              <label key={c.id} className="flex items-center gap-2">
-                <input type="checkbox" checked={ids.includes(c.id)} onChange={() => setIds((x) => (x.includes(c.id) ? x.filter((i) => i !== c.id) : [...x, c.id]))} />
-                {c.name}
-              </label>
-            ))}
+          <div className="pl-6">
+            <ClientMultiSelect value={ids} onChange={setIds} />
           </div>
         )}
       </div>
@@ -145,14 +140,7 @@ function Members() {
             <fieldset>
               <legend className="mb-1.5 text-sm font-medium">Limit to clients</legend>
               <p className="mb-2 text-xs text-ink-3">Leave empty to use the role default (external roles see no clients until assigned).</p>
-              <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
-                {clients.map((c) => (
-                  <label key={c.id} className="flex items-center gap-2 text-sm">
-                    <input type="checkbox" checked={invite.clientIds.includes(c.id)} onChange={() => setInvite({ ...invite, clientIds: invite.clientIds.includes(c.id) ? invite.clientIds.filter((x) => x !== c.id) : [...invite.clientIds, c.id] })} />
-                    {c.name}
-                  </label>
-                ))}
-              </div>
+              <ClientMultiSelect value={invite.clientIds} onChange={(clientIds) => setInvite({ ...invite, clientIds })} placeholder="All clients the role allows" />
             </fieldset>
           </div>
         )}

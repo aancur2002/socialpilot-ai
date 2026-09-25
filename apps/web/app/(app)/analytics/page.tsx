@@ -1,5 +1,6 @@
 'use client';
 
+import { ClientSelect } from '@/components/client-select';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { RefreshCw, Sparkles } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -217,9 +218,7 @@ export default function AnalyticsPage() {
       {tab === 'reports' && (
         <div className="space-y-4">
           <Panel className="flex flex-wrap items-center gap-3 p-4">
-            <Select aria-label="Client" className="max-w-64" value={reportClient} onChange={(e) => setReportClient(e.target.value)}>
-              {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </Select>
+            <ClientSelect aria-label="Client" className="w-64" value={reportClient || null} onChange={(v) => v && setReportClient(v)} />
             <Button loading={generate.isPending} disabled={!reportClient} onClick={() => generate.mutate()}><Sparkles className="h-4 w-4" /> Write report for the last {days} days</Button>
             <p className="text-xs text-ink-3">The AI summarizes stored numbers only and notes correlations, not causes.</p>
           </Panel>

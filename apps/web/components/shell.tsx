@@ -1,5 +1,6 @@
 'use client';
 
+import { ClientSelect } from './client-select';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   BarChart3,
@@ -33,7 +34,7 @@ import { useSession } from '@/lib/session';
 import type { Notification, Paged } from '@/lib/types';
 import { ago } from './domain';
 import { DropdownMenu } from './ui/overlay';
-import { Button, cn, Select } from './ui/primitives';
+import { Button, cn } from './ui/primitives';
 
 interface NavItem {
   href: string;
@@ -70,7 +71,7 @@ const NAV: { group: string; items: NavItem[] }[] = [
 
 function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
-  const { can, clients, clientId, setClientId, me, org } = useSession();
+  const { can, clientId, setClientId, me, org } = useSession();
   const counts = useQuery({ queryKey: ['dashboard', clientId], queryFn: () => api<{ unreadMessages: number | null; pendingApprovals: number | null }>('/dashboard', { query: { clientId } }), refetchInterval: 30_000 });
   const badge: Record<string, number | null | undefined> = { '/inbox': counts.data?.unreadMessages, '/approvals': counts.data?.pendingApprovals };
 
@@ -83,22 +84,7 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         <p className="mt-0.5 truncate text-xs">{org.name}</p>
       </div>
       <div className="px-3 pb-3">
-        <label htmlFor="client-scope" className="sr-only">
-          Client
-        </label>
-        <Select
-          id="client-scope"
-          value={clientId ?? ''}
-          onChange={(e) => setClientId(e.target.value || null)}
-          className="border-rail-active bg-rail-active text-white"
-        >
-          <option value="">All clients</option>
-          {clients.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </Select>
+        <ClientSelect id="client-scope" aria-label="Client" variant="rail" value={clientId} onChange={setClientId} allLabel="All clients" />
       </div>
       <nav className="flex-1 overflow-y-auto px-2 pb-4" aria-label="Main">
         {NAV.map((section) => (

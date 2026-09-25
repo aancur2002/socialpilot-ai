@@ -24,6 +24,7 @@
     "db:migrate": "npm run migrate:dev --workspace @socialpilot/database",
     "db:deploy": "npm run migrate:deploy --workspace @socialpilot/database",
     "db:seed": "tsx packages/core/scripts/seed.ts",
+    "platform-admin": "tsx packages/core/scripts/platform-admin.ts",
     "db:reset": "npm run reset --workspace @socialpilot/database",
     "infra:up": "docker compose up -d postgres redis",
     "infra:down": "docker compose down",

@@ -1,5 +1,6 @@
 'use client';
 
+import { ClientSelect } from './client-select';
 import { DndContext, PointerSensor, useDraggable, useDroppable, useSensor, useSensors } from '@dnd-kit/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Users } from 'lucide-react';
@@ -43,9 +44,7 @@ export function NewLeadButton() {
       <Modal open={open} onOpenChange={setOpen} title="Add a lead" footer={<Button loading={create.isPending} disabled={!form.clientId} onClick={() => create.mutate()}>Add lead</Button>}>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Client" htmlFor="l-client">
-            <Select id="l-client" value={form.clientId} onChange={(e) => setForm({ ...form, clientId: e.target.value })}>
-              {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </Select>
+            <ClientSelect id="l-client" value={form.clientId || null} onChange={(v) => v && setForm({ ...form, clientId: v })} />
           </Field>
           <Field label="Name" htmlFor="l-name"><Input id="l-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
           <Field label="Email" htmlFor="l-email"><Input id="l-email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Field>

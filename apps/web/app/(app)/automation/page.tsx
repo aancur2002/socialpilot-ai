@@ -1,5 +1,6 @@
 'use client';
 
+import { ClientSelect } from '@/components/client-select';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { INTENTS, PLATFORMS } from '@socialpilot/validation';
 import { Plus, Trash2, Workflow, X } from 'lucide-react';
@@ -44,7 +45,7 @@ function describeCondition(c: Condition) {
 
 function RuleEditor({ rule, onClose }: { rule: AutomationRule | null; onClose: () => void }) {
   const qc = useQueryClient();
-  const { clients, clientId, can } = useSession();
+  const { clientId, can } = useSession();
   const [name, setName] = useState(rule?.name ?? '');
   const [scope, setScope] = useState<string>(rule ? (rule.clientId ?? '') : (clientId ?? ''));
   const [trigger, setTrigger] = useState(rule?.trigger ?? 'MESSAGE_RECEIVED');
@@ -74,10 +75,7 @@ function RuleEditor({ rule, onClose }: { rule: AutomationRule | null; onClose: (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Name" htmlFor="r-name"><Input id="r-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Escalate complaints" /></Field>
           <Field label="Applies to" htmlFor="r-scope">
-            <Select id="r-scope" value={scope} onChange={(e) => setScope(e.target.value)}>
-              <option value="">Every client</option>
-              {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </Select>
+            <ClientSelect id="r-scope" value={scope || null} onChange={(v) => setScope(v ?? '')} allLabel="Every client" />
           </Field>
         </div>
         <Field label="When" htmlFor="r-trigger">
