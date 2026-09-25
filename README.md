@@ -108,6 +108,7 @@ tests/        Integration tests (Vitest)
 
 ## Documentation
 
+- **[How to use SocialPilot AI](HOW_TO_USE.md)**: setup, every feature step by step, going live, testing and development
 - [Architecture](docs/architecture.md)
 - [Local development](docs/local-development.md)
 - [Deployment](docs/deployment.md)
