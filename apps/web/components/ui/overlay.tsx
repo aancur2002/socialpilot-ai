@@ -4,6 +4,8 @@ import * as Dialog from '@radix-ui/react-dialog';
 import * as Menu from '@radix-ui/react-dropdown-menu';
 import { X } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
+import { toast } from 'sonner';
+import { errorMessage } from '@/lib/api';
 import { Button, cn } from './primitives';
 
 export function Modal({ open, onOpenChange, title, description, children, footer, wide }: { open: boolean; onOpenChange: (o: boolean) => void; title: string; description?: string; children: ReactNode; footer?: ReactNode; wide?: boolean }) {
@@ -76,6 +78,10 @@ export function ConfirmButton({ children, title, description, confirmLabel, onCo
                 try {
                   await onConfirm();
                   setOpen(false);
+                } catch (e) {
+                  // Keep the dialog open; the same id collapses a toast the caller already showed.
+                  const message = errorMessage(e);
+                  toast.error(message, { id: message });
                 } finally {
                   setBusy(false);
                 }

@@ -378,7 +378,7 @@ export async function scheduleContent(ctx: AuthContext, id: string, input: { sch
   const content = await loadContent(ctx, id);
   const settings = await getClientSettings(ctx.organizationId, content.clientId);
   if (settings.humanApprovalRequired && content.status !== 'APPROVED' && content.status !== 'SCHEDULED') {
-    throw badRequest('This client requires approval before content can be scheduled');
+    throw badRequest('This client requires approval first. Submit the post for approval; once it is approved you can schedule or publish it.');
   }
   if (!['DRAFT', 'APPROVED', 'SCHEDULED', 'FAILED'].includes(content.status)) throw badRequest(`Content that is ${content.status.toLowerCase()} cannot be scheduled`);
   if (input.scheduledAt.getTime() < Date.now() - 60_000) throw badRequest('The scheduled time is in the past');

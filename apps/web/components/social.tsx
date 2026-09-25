@@ -79,7 +79,10 @@ export function SocialAccountsPanel({ clientId }: { clientId: string }) {
       window.location.assign(r.authorizationUrl);
     },
     onSuccess: invalidate,
-    onError: (e) => toast.error(errorMessage(e)),
+    onError: (e) => {
+      const message = errorMessage(e);
+      toast.error(message, { id: message });
+    },
   });
   const refresh = useMutation({ mutationFn: (id: string) => api(`/social/accounts/${id}/refresh`, { body: {} }), onSuccess: invalidate, onError: (e) => toast.error(errorMessage(e)) });
 

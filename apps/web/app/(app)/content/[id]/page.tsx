@@ -163,7 +163,10 @@ export default function ContentDetailPage() {
       setData(c);
       toast.success(v.success);
     },
-    onError: (e) => toast.error(errorMessage(e)),
+    onError: (e) => {
+      const message = errorMessage(e);
+      toast.error(message, { id: message });
+    },
   });
 
   if (q.isLoading) return <div className="space-y-4">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-40" />)}</div>;
