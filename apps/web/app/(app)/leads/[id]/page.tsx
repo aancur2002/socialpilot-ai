@@ -32,7 +32,7 @@ export default function LeadPage() {
   return (
     <>
       <PageHeader title={l.name ?? l.username ?? 'Lead'} description={<span className="flex items-center gap-2"><LeadStatusBadge status={l.status} />{l.client?.name}, created {when(l.createdAt)}</span>} />
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_360px]">
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[1fr_360px]">
         <Panel>
           <PanelHeader title="Notes" />
           <div className="p-5">{can('leads:manage') ? <LeadNotes lead={l} /> : <p className="text-sm text-ink-2">You can view notes but not add them.</p>}</div>

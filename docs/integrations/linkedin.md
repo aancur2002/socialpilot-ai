@@ -8,7 +8,10 @@
 2. The **Sign In with LinkedIn using OpenID Connect** and **Share on LinkedIn** products give member posting (`w_member_social`). These are self-serve.
 3. Organization pages, comments and page analytics need the **Community Management API**, which requires an application and approval (Development tier, then Standard tier). Without it, only member (personal) posting works.
 
-## Environment
+## Credentials
+
+Enter them in **Platform admin → Integrations** (recommended: encrypted, no restart, with a credential check), or set the environment variables below. Values saved in the dashboard override the environment. The Integrations card also shows the exact redirect URI and webhook URL to copy into the developer console.
+
 
 | Variable | Value |
 |---|---|

@@ -63,6 +63,13 @@ export class TikTokAdapter extends BaseAdapter {
     return ['user.info.basic', 'user.info.profile', 'user.info.stats', 'video.publish', 'video.upload', 'video.list'];
   }
 
+  /** Client-credentials token request — proves the client key and secret are valid. */
+  async checkAppCredentials(): Promise<{ ok: boolean | null; message: string }> {
+    const { clientId, clientSecret } = this.requireConfigured();
+    await this.http.post(`${API}/oauth/token/`, { form: { client_key: clientId, client_secret: clientSecret, grant_type: 'client_credentials' } });
+    return { ok: true, message: 'TikTok accepted the client key and secret.' };
+  }
+
   async getAuthorizationUrl(input: OAuthInput): Promise<string> {
     const { clientId } = this.requireConfigured();
     const url = new URL('https://www.tiktok.com/v2/auth/authorize/');

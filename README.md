@@ -9,6 +9,8 @@ Multi-tenant social media management for agencies: plan and generate content wit
 - **Analytics**: platform metrics are stored as historical snapshots, alongside your own activity metrics and AI-written reports. Metrics a platform doesn't provide are shown as unavailable, never estimated.
 - **Integrations** use official OAuth and APIs only. Adapters exist for Facebook, Instagram, WhatsApp, LinkedIn and TikTok. Each has a development-only **mock** counterpart, so the whole product runs without platform credentials.
 
+> **Going live with a platform:** sign in as the platform admin, open **Platform admin → Integrations**, copy the redirect and webhook URLs into the platform's developer app, and paste its credentials. Agencies can then connect real accounts, and mock accounts get a **Switch to real account** button that moves their scheduled posts over.
+
 > **Integration status:** the real platform adapters are implemented but **unverified**. None has been tested against a live platform with approved credentials. See [BUILD_STATUS.md](BUILD_STATUS.md) and [docs/integrations](docs/integrations).
 
 ## Quick start (local)
@@ -62,11 +64,11 @@ Every variable is documented in [`env.example`](env.example) and validated at st
 | `DATABASE_URL`, `REDIS_URL` | Postgres 16 with pgvector, and Redis |
 | `ENCRYPTION_KEY` | 32-byte base64 key for AES-256-GCM encryption of OAuth tokens (rotation: `ENCRYPTION_KEY_VERSION`, `ENCRYPTION_KEY_PREVIOUS`) |
 | `JWT_SECRET` | Signs cookies and derived secrets |
-| `AI_PROVIDER` | `mock` (offline, deterministic), `anthropic` or `openai`, with `AI_API_KEY` |
+| `AI_PROVIDER` | `mock` (offline, deterministic), `anthropic` or `openai`, with `AI_API_KEY`. Each organization can override the provider, models and key in **Settings → AI models** |
 | `EMBEDDING_PROVIDER` | `mock` (local hashing, lexical only) or `openai` |
 | `STORAGE_DRIVER` | `local` (development) or `s3` with the `S3_*` settings |
 | `SOCIAL_MOCK_MODE` | Enables the Mock* adapters. Refused in production |
-| `FACEBOOK_*`, `INSTAGRAM_*`, `WHATSAPP_*`, `LINKEDIN_*`, `TIKTOK_*` | Platform app credentials (see the integration guides) |
+| `FACEBOOK_*`, `INSTAGRAM_*`, `WHATSAPP_*`, `LINKEDIN_*`, `TIKTOK_*` | Platform app credentials (see the integration guides). They can also be managed in **Platform admin → Integrations**, which overrides these |
 
 Production guards: with `NODE_ENV=production` or `APP_ENV=production`, the config refuses mock social providers, the mock AI provider and local storage.
 

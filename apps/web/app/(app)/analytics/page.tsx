@@ -186,7 +186,7 @@ export default function AnalyticsPage() {
       )}
 
       {tab === 'leads' && leads.data && (
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
           <Panel>
             <PanelHeader title="Leads by stage" description={`${leads.data.total} leads${leads.data.conversionRate !== null ? `, ${leads.data.conversionRate}% won` : ''}`} />
             <SingleBar label="Leads" data={leads.data.byStatus.map((s) => ({ name: humanize(s.status), value: s.count }))} />
@@ -201,7 +201,7 @@ export default function AnalyticsPage() {
       {tab === 'ai' && ai.data && (
         <div className="space-y-4">
           <p className="text-sm text-ink-2">{ai.data.note} Average: {ai.data.averageConfidence === null ? '—' : `${Math.round(ai.data.averageConfidence * 100)}%`}.</p>
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
             <Panel>
               <PanelHeader title="What happened to AI drafts" />
               <SingleBar label="Drafts" data={ai.data.byDecision.map((d) => ({ name: humanize(d.decision), value: d.count }))} />

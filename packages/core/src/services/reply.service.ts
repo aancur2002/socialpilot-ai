@@ -20,6 +20,7 @@ import { requirePermission, systemContext, type AuthContext } from '../context';
 import { notFound } from '../errors';
 import { getInfra } from '../infra';
 import { generationLogger } from './ai-log.service';
+import { aiFor } from './ai-settings.service';
 import { audit } from './audit.service';
 import { runAutomationForEvent } from './automation.service';
 import { brandContext } from './content.service';
@@ -117,7 +118,7 @@ export async function processInboundMessage(messageId: string, opts: { force?: b
 }
 
 async function runPipeline(messageId: string, opts: { force?: boolean; requestedBy?: AuthContext }): Promise<PipelineResult> {
-  const { db, ai, logger } = getInfra();
+  const { db, logger } = getInfra();
   const message = await db.message.findUnique({
     where: { id: messageId },
     include: { conversation: { include: { socialAccount: true, contact: true, client: { include: { brandProfile: true, settings: true } } } } },
@@ -127,6 +128,7 @@ async function runPipeline(messageId: string, opts: { force?: boolean; requested
   const conversation = message.conversation;
   const { client, socialAccount: account } = conversation;
   const ctx = systemContext(conversation.organizationId);
+  const { ai } = await aiFor(conversation.organizationId);
   const log = logger.child({ organizationId: conversation.organizationId, clientId: client.id, conversationId: conversation.id, platform: account.platform, operation: 'reply_pipeline' });
 
   const existing = await db.aiReplySuggestion.findUnique({ where: { inboundMessageId: messageId } });

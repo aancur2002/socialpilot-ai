@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { MockBadge, PlatformChip, platformName } from '@/components/domain';
+import { TimezoneSelect, browserTimezone } from '@/components/timezone-select';
 import { Button, cn, Field, Input, Panel, Switch, Textarea } from '@/components/ui/primitives';
 import { api, errorMessage, getCurrentOrg, setCurrentOrg } from '@/lib/api';
 import type { Client, Content, CurrentOrg, Me, PlatformStatus, SocialAccount } from '@/lib/types';
@@ -22,7 +23,7 @@ export default function OnboardingPage() {
   const [orgName, setOrgName] = useState('');
   const [client, setClient] = useState<Client | null>(null);
   const [clientName, setClientName] = useState('');
-  const [timezone, setTimezone] = useState(() => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC');
+  const [timezone, setTimezone] = useState(browserTimezone);
   const [brand, setBrand] = useState({ description: '', tone: '', targetAudience: '', services: '', website: '', cta: '', preferredHashtags: '' });
   const [ai, setAi] = useState({ aiEnabled: true, autoReplyEnabled: false, humanApprovalRequired: true });
   const [topic, setTopic] = useState('');
@@ -130,7 +131,7 @@ export default function OnboardingPage() {
                 <Input id="cname" value={clientName} onChange={(e) => setClientName(e.target.value)} placeholder="Bella's Bakery" />
               </Field>
               <Field label="Timezone" htmlFor="tz" hint="Used for scheduling and business hours">
-                <Input id="tz" value={timezone} onChange={(e) => setTimezone(e.target.value)} />
+                <TimezoneSelect id="tz" value={timezone} onChange={setTimezone} />
               </Field>
               <Button loading={busy} disabled={!clientName.trim()} onClick={() => run(async () => {
                 const created = await api<Client>('/clients', { body: { name: clientName, timezone } });

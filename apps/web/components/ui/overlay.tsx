@@ -30,12 +30,12 @@ export function Modal({ open, onOpenChange, title, description, children, footer
 }
 
 /** Right-hand drawer for detail views. */
-export function Drawer({ open, onOpenChange, title, children }: { open: boolean; onOpenChange: (o: boolean) => void; title: string; children: ReactNode }) {
+export function Drawer({ open, onOpenChange, title, children, wide, footer }: { open: boolean; onOpenChange: (o: boolean) => void; title: string; children: ReactNode; wide?: boolean; footer?: ReactNode }) {
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-40 bg-[#0d1524]/40" />
-        <Dialog.Content className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l border-line bg-surface shadow-xl">
+        <Dialog.Content aria-describedby={undefined} className={cn('fixed inset-y-0 right-0 z-50 flex w-full flex-col border-l border-line bg-surface shadow-xl', wide ? 'max-w-2xl' : 'max-w-md')}>
           <div className="flex items-center justify-between border-b border-line px-5 py-4">
             <Dialog.Title className="font-semibold">{title}</Dialog.Title>
             <Dialog.Close className="rounded p-1 text-ink-3 hover:bg-surface-2" aria-label="Close">
@@ -43,6 +43,7 @@ export function Drawer({ open, onOpenChange, title, children }: { open: boolean;
             </Dialog.Close>
           </div>
           <div className="flex-1 overflow-y-auto px-5 py-4">{children}</div>
+          {footer && <div className="flex flex-wrap justify-end gap-2 border-t border-line px-5 py-3">{footer}</div>}
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

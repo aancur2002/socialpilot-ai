@@ -5,6 +5,7 @@ import { AppError } from '../errors';
 import { getInfra } from '../infra';
 import { startOfDayUtc } from '../lib/util';
 import { generationLogger } from './ai-log.service';
+import { aiFor } from './ai-settings.service';
 import { audit } from './audit.service';
 import { getClient } from './client.service';
 import { loadAdapterAccount } from './social.service';
@@ -243,7 +244,7 @@ export async function generateReport(ctx: AuthContext, input: { clientId: string
     ...o.platformMetrics,
   });
   const metrics = flatten(overview);
-  const agent = new AnalyticsAgent(getInfra().ai, generationLogger({ organizationId: ctx.organizationId, clientId: input.clientId, userId: ctx.userId }));
+  const agent = new AnalyticsAgent((await aiFor(ctx.organizationId)).ai, generationLogger({ organizationId: ctx.organizationId, clientId: input.clientId, userId: ctx.userId }));
   let summary;
   try {
     summary = await agent.summarize({

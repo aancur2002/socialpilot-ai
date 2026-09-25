@@ -62,6 +62,13 @@ export class FacebookAdapter extends BaseAdapter {
     ];
   }
 
+  /** Requests an app access token (client_credentials) — proves the app ID and secret are valid. */
+  async checkAppCredentials(): Promise<{ ok: boolean | null; message: string }> {
+    const { clientId, clientSecret } = this.requireConfigured();
+    await this.http.get(this.url('oauth/access_token'), { query: { client_id: clientId, client_secret: clientSecret, grant_type: 'client_credentials' } });
+    return { ok: true, message: 'Meta accepted the app ID and secret.' };
+  }
+
   async getAuthorizationUrl(input: OAuthInput): Promise<string> {
     const { clientId } = this.requireConfigured();
     const url = new URL(`https://www.facebook.com/${this.config.graphVersion}/dialog/oauth`);

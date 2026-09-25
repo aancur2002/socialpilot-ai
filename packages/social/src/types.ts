@@ -239,6 +239,12 @@ export interface SocialPlatformAdapter {
 
   getAnalytics(account: SocialAccount, range: DateRange, platformPostIds?: string[]): Promise<AnalyticsResult>;
 
+  /**
+   * Verifies the app credentials with the platform without a user login, where the
+   * platform allows it. ok=null means the platform offers no such check.
+   */
+  checkAppCredentials?(): Promise<{ ok: boolean | null; message: string }>;
+
   /** Answers the platform's webhook subscription challenge, or null if not a challenge. */
   handleWebhookChallenge?(query: Record<string, string | undefined>): string | null;
   verifyWebhookSignature?(req: WebhookRequest): boolean;

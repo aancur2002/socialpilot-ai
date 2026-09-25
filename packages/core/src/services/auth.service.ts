@@ -81,3 +81,26 @@ export async function validateSession(token: string | undefined): Promise<Sessio
 export async function revokeAllSessions(userId: string): Promise<void> {
   await getInfra().db.session.updateMany({ where: { userId, revokedAt: null }, data: { revokedAt: new Date() } });
 }
+
+export async function updateProfile(userId: string, input: { name: string }) {
+  const user = await getInfra().db.user.update({ where: { id: userId }, data: { name: input.name }, select: { id: true, email: true, name: true, isSuperAdmin: true } });
+  await auditGlobal({ action: 'user.profile_updated', resourceType: 'User', resourceId: userId, userId, after: { name: input.name } });
+  return user;
+}
+
+/**
+ * Changes the password after verifying the current one, then signs out every
+ * other session of this user (the current session stays signed in).
+ */
+export async function changePassword(userId: string, currentSessionId: string, input: { currentPassword: string; newPassword: string }, meta: { ip?: string; userAgent?: string }) {
+  const { db } = getInfra();
+  const user = await db.user.findUniqueOrThrow({ where: { id: userId } });
+  if (!user.passwordHash || !(await verifyPassword(input.currentPassword, user.passwordHash))) {
+    await auditGlobal({ action: 'user.password_change_failed', resourceType: 'User', resourceId: userId, userId, ip: meta.ip, userAgent: meta.userAgent });
+    throw new AppError('VALIDATION_ERROR', 'Your current password is incorrect', [{ path: 'currentPassword', message: 'Incorrect password' }]);
+  }
+  await db.user.update({ where: { id: userId }, data: { passwordHash: await hashPassword(input.newPassword) } });
+  const revoked = await db.session.updateMany({ where: { userId, revokedAt: null, id: { not: currentSessionId } }, data: { revokedAt: new Date() } });
+  await auditGlobal({ action: 'user.password_changed', resourceType: 'User', resourceId: userId, userId, ip: meta.ip, userAgent: meta.userAgent, after: { otherSessionsSignedOut: revoked.count } });
+  return { otherSessionsSignedOut: revoked.count };
+}

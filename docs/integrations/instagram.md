@@ -8,7 +8,10 @@
 2. Connected accounts must be Instagram **Business or Creator** accounts. Personal accounts are not supported by the API.
 3. **App Review** (Advanced Access) for the scopes below, plus business verification, before the public can connect.
 
-## Environment
+## Credentials
+
+Enter them in **Platform admin → Integrations** (recommended: encrypted, no restart, with a credential check), or set the environment variables below. Values saved in the dashboard override the environment. The Integrations card also shows the exact redirect URI and webhook URL to copy into the developer console.
+
 
 | Variable | Value |
 |---|---|

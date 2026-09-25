@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { TimezoneSelect, browserTimezone } from '@/components/timezone-select';
 import { Modal } from '@/components/ui/overlay';
 import { Button, EmptyState, Field, Input, PageHeader, Panel } from '@/components/ui/primitives';
 import { api, errorMessage } from '@/lib/api';
@@ -18,7 +19,7 @@ export default function ClientsPage() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
-  const [timezone, setTimezone] = useState(() => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC');
+  const [timezone, setTimezone] = useState(browserTimezone);
   const create = useMutation({
     mutationFn: () => api<Client>('/clients', { body: { name, timezone } }),
     onSuccess: (c) => {
@@ -53,7 +54,7 @@ export default function ClientsPage() {
       <Modal open={open} onOpenChange={setOpen} title="Add client" footer={<Button loading={create.isPending} disabled={!name.trim()} onClick={() => create.mutate()}>Create client</Button>}>
         <div className="space-y-4">
           <Field label="Client or brand name" htmlFor="c-name"><Input id="c-name" value={name} onChange={(e) => setName(e.target.value)} /></Field>
-          <Field label="Timezone" htmlFor="c-tz" hint="IANA name, e.g. Europe/London"><Input id="c-tz" value={timezone} onChange={(e) => setTimezone(e.target.value)} /></Field>
+          <Field label="Timezone" htmlFor="c-tz" hint="Used for scheduling and business hours"><TimezoneSelect id="c-tz" value={timezone} onChange={setTimezone} /></Field>
         </div>
       </Modal>
     </>

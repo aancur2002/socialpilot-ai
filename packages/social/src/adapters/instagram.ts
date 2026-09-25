@@ -59,6 +59,11 @@ export class InstagramAdapter extends BaseAdapter {
     ];
   }
 
+  async checkAppCredentials(): Promise<{ ok: boolean | null; message: string }> {
+    this.requireConfigured();
+    return { ok: null, message: 'Instagram can’t verify app credentials without a user sign-in. Connect a test account to confirm they work.' };
+  }
+
   async getAuthorizationUrl(input: OAuthInput): Promise<string> {
     const { clientId } = this.requireConfigured();
     const url = new URL('https://www.instagram.com/oauth/authorize');

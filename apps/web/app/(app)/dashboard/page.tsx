@@ -74,7 +74,7 @@ export default function DashboardPage() {
       </section>
       {dash.error && <ErrorState error={dash.error} onRetry={() => dash.refetch()} />}
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.4fr_1fr]">
+      <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[1.4fr_1fr]">
         <Panel>
           <PanelHeader title="Needs attention" description="Escalated conversations, posts waiting for approval and failed posts." />
           <ul className="space-y-2 p-4">

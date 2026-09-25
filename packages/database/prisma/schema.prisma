@@ -336,6 +336,7 @@ model Organization {
 
   members     OrganizationMember[]
   invitations Invitation[]
+  aiSettings  OrganizationAiSettings?
   clients     Client[]
   usage       UsageCounter[]
 }
@@ -428,6 +429,30 @@ model UsageCounter {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@unique([organizationId, metric, period])
+}
+
+/// Per-organization AI configuration, managed from Settings → AI models.
+/// Any field left null falls back to the server's environment defaults.
+/// API keys are AES-256-GCM encrypted (organization id as associated data) and never returned.
+model OrganizationAiSettings {
+  id                  String   @id @default(cuid())
+  organizationId      String   @unique
+  /// anthropic | openai | mock
+  provider            String?
+  model               String?
+  fastModel           String?
+  apiKeyEnc           String?
+  /// OpenAI-compatible base URL (optional)
+  baseUrl             String?
+  /// openai | mock
+  embeddingProvider   String?
+  embeddingModel      String?
+  embeddingApiKeyEnc  String?
+  updatedById         String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 }
 
 // ───────────────────────────── Clients ─────────────────────────────
@@ -599,6 +624,8 @@ model OAuthState {
   platform       Platform
   /// true when the flow targets a development Mock* adapter
   isMock         Boolean   @default(false)
+  /// Mock account to replace with the real account once connected
+  replaceAccountId String?
   codeVerifier   String?
   redirectPath   String?
   expiresAt      DateTime
@@ -606,6 +633,27 @@ model OAuthState {
   createdAt      DateTime  @default(now())
 
   @@index([expiresAt])
+}
+
+/// Platform app credentials managed from Platform admin → Integrations.
+/// Each field overrides the matching environment variable when set.
+/// Secrets are AES-256-GCM encrypted with the platform as associated data.
+model PlatformCredential {
+  id                    String    @id @default(cuid())
+  platform              Platform  @unique
+  clientId              String?
+  clientSecretEnc       String?
+  webhookVerifyTokenEnc String?
+  /// WhatsApp Embedded Signup configuration id
+  configId              String?
+  /// Platform-specific switches, e.g. {"organizationScopes": true} for LinkedIn
+  options               Json      @default("{}")
+  checkedAt             DateTime?
+  checkOk               Boolean?
+  checkMessage          String?
+  updatedById           String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 }
 
 // ───────────────────────────── Content ─────────────────────────────

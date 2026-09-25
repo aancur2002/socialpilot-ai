@@ -5,6 +5,7 @@ import { requirePermission, tenantWhere, type AuthContext } from '../context';
 import { AppError, badRequest, notFound } from '../errors';
 import { getInfra, mockWebhookSecret } from '../infra';
 import { ingestNormalizedEvent } from './inbox.service';
+import { getSocial } from './platform-credentials.service';
 
 export interface WebhookReceipt {
   received: number;
@@ -13,8 +14,8 @@ export interface WebhookReceipt {
 }
 
 /** GET handshake used by Meta platforms (and the mock provider). */
-export function answerWebhookChallenge(platform: PlatformKey, query: Record<string, string | undefined>, mock = false): string | null {
-  const { social } = getInfra();
+export async function answerWebhookChallenge(platform: PlatformKey, query: Record<string, string | undefined>, mock = false): Promise<string | null> {
+  const social = await getSocial();
   const adapter = mock ? social.mock(platform) : social.realAdapter(platform);
   return adapter.handleWebhookChallenge?.(query) ?? null;
 }
@@ -24,7 +25,8 @@ export function answerWebhookChallenge(platform: PlatformKey, query: Record<stri
  * Heavy work happens in the worker so the platform gets a fast 200.
  */
 export async function receiveWebhook(platform: PlatformKey, req: WebhookRequest, mock = false): Promise<WebhookReceipt> {
-  const { db, social, queues, logger } = getInfra();
+  const { db, queues, logger } = getInfra();
+  const social = await getSocial();
   const adapter = mock ? social.mock(platform) : social.realAdapter(platform);
   if (!adapter.verifyWebhookSignature || !adapter.parseWebhook) throw new AppError('NOT_FOUND', `${platform} does not deliver webhooks`);
   if (!adapter.verifyWebhookSignature(req)) throw new AppError('UNAUTHENTICATED', 'Invalid webhook signature');

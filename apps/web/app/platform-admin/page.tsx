@@ -1,16 +1,17 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useEffect } from 'react';
 import { AdminConsole } from '@/components/admin-console';
 import { Button } from '@/components/ui/primitives';
 import { api } from '@/lib/api';
 import type { Me } from '@/lib/types';
 
 /** Standalone console for platform super admins who don't belong to any organization. */
-export default function PlatformAdminPage() {
+function PlatformAdmin() {
   const router = useRouter();
+  const tab = useSearchParams().get('tab') === 'integrations' ? 'integrations' : 'overview';
   const me = useQuery({ queryKey: ['me'], queryFn: () => api<Me>('/auth/me'), retry: false });
   useEffect(() => {
     if (me.error) router.replace('/login');
@@ -25,8 +26,16 @@ export default function PlatformAdminPage() {
         </Button>
       </header>
       <main className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6 lg:px-8">
-        <AdminConsole enabled={me.data.user.isSuperAdmin} />
+        <AdminConsole enabled={me.data.user.isSuperAdmin} initialTab={tab} />
       </main>
     </div>
+  );
+}
+
+export default function PlatformAdminPage() {
+  return (
+    <Suspense>
+      <PlatformAdmin />
+    </Suspense>
   );
 }

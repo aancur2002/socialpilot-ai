@@ -2,7 +2,7 @@ import { getInfra, readinessReport } from '@socialpilot/core';
 import type { FastifyInstance } from 'fastify';
 import { authRoutes } from './auth';
 import { contentRoutes, localMediaRoutes } from './content';
-import { adminRoutes, analyticsRoutes, automationRoutes, crmRoutes, inboxRoutes, knowledgeRoutes } from './engagement';
+import { adminRoutes, aiSettingsRoutes, analyticsRoutes, automationRoutes, crmRoutes, inboxRoutes, knowledgeRoutes } from './engagement';
 import { organizationRoutes } from './organization';
 import { socialRoutes, webhookRoutes } from './social';
 
@@ -36,6 +36,7 @@ export async function registerRoutes(app: FastifyInstance) {
       await v1.register(knowledgeRoutes);
       await v1.register(automationRoutes);
       await v1.register(analyticsRoutes);
+      await v1.register(aiSettingsRoutes);
       await v1.register(adminRoutes);
     },
     { prefix: '/api/v1' },

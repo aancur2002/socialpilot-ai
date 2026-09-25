@@ -135,6 +135,8 @@ export const startOAuthSchema = z.object({
   clientId: idSchema,
   platform: platformSchema,
   redirectPath: z.string().max(300).regex(/^\/[^/\\]/, 'must be a relative path').optional(),
+  /** A mock account to replace with the real account once the sign-in completes */
+  replaceAccountId: idSchema.optional(),
 });
 export const connectMockSchema = z.object({ clientId: idSchema, platform: platformSchema, displayName: trimmed(120).optional() });
 
@@ -339,4 +341,46 @@ export const createCampaignSchema = z.object({
   goal: optionalText(1000),
   startsAt: z.coerce.date().optional().nullable(),
   endsAt: z.coerce.date().optional().nullable(),
+});
+
+// ── Account ─────────────────────────────────────────────────────────────
+export const updateProfileSchema = z.object({ name: trimmed(120) });
+export const changePasswordSchema = z
+  .object({
+    currentPassword: z.string().min(1).max(200),
+    newPassword: z.string().min(10, 'Use at least 10 characters').max(200),
+  })
+  .refine((v) => v.currentPassword !== v.newPassword, { message: 'Choose a password different from the current one', path: ['newPassword'] });
+
+// ── Knowledge edits ─────────────────────────────────────────────────────
+export const updateKnowledgeSourceSchema = z
+  .object({ title: trimmed(300).optional(), content: z.string().trim().min(1).max(500_000).optional() })
+  .refine((v) => v.title !== undefined || v.content !== undefined, { message: 'Nothing to update' });
+
+// ── AI model settings (per organization) ────────────────────────────────
+export const AI_PROVIDERS = ['anthropic', 'openai', 'mock'] as const;
+export const EMBEDDING_PROVIDERS = ['openai', 'mock'] as const;
+const modelId = z.string().trim().min(1).max(120).regex(/^[A-Za-z0-9._:/@-]+$/, 'Model IDs contain letters, numbers, dots, dashes, slashes or colons');
+export const aiSettingsSchema = z.object({
+  /** null = use the server default */
+  provider: z.enum(AI_PROVIDERS).nullable().optional(),
+  model: modelId.nullable().optional(),
+  fastModel: modelId.nullable().optional(),
+  /** undefined = keep the stored key, null = remove it, string = replace it */
+  apiKey: z.string().trim().min(8).max(500).nullable().optional(),
+  baseUrl: z.url().max(300).nullable().optional().or(z.literal('')),
+  embeddingProvider: z.enum(EMBEDDING_PROVIDERS).nullable().optional(),
+  embeddingModel: modelId.nullable().optional(),
+  embeddingApiKey: z.string().trim().min(8).max(500).nullable().optional(),
+});
+export type AiSettingsInput = z.infer<typeof aiSettingsSchema>;
+
+// ── Platform app credentials (platform admins) ─────────────────────────
+const secretField = z.string().trim().min(4).max(500).nullable().optional();
+export const platformSetupSchema = z.object({
+  clientId: z.string().trim().min(2).max(200).nullable().optional(),
+  clientSecret: secretField,
+  webhookVerifyToken: secretField,
+  configId: z.string().trim().min(2).max(200).nullable().optional(),
+  organizationScopes: z.boolean().optional(),
 });

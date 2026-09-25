@@ -59,7 +59,7 @@ export default function NewContentPage() {
   return (
     <>
       <PageHeader title="New post" description="Start from an idea and let AI write a version for each platform, or write it yourself." />
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[1fr_320px]">
         <Panel>
           <div className="px-5 pt-3">
             <Tabs value={mode} onChange={setMode} items={[{ value: 'ai', label: 'Generate with AI' }, { value: 'manual', label: 'Write manually' }]} />

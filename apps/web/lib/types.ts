@@ -63,6 +63,7 @@ export interface Client {
   slug: string;
   status: 'ACTIVE' | 'ARCHIVED';
   timezone: string;
+  updatedAt?: string;
   brandProfile: BrandProfile | null;
   settings?: ClientSettings | null;
   _count?: { socialAccounts: number; contents: number; leads: number };

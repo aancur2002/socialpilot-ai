@@ -8,6 +8,7 @@ import { audit } from './audit.service';
 import { getClient } from './client.service';
 import { notifyClientMembers } from './notification.service';
 import { assertWithinLimit } from './organization.service';
+import { getSocial } from './platform-credentials.service';
 import { TokenService } from './token.service';
 
 /** Public shape of a social account — never includes credentials. */
@@ -31,8 +32,8 @@ const publicSelect = {
   token: { select: { expiresAt: true, revokedAt: true } },
 } satisfies Prisma.SocialAccountSelect;
 
-export function platformStatuses() {
-  const { social } = getInfra();
+export async function platformStatuses() {
+  const social = await getSocial();
   return { mockEnabled: social.mockEnabled, platforms: social.statuses() };
 }
 
@@ -40,10 +41,16 @@ export function oauthRedirectUri(platform: PlatformKey): string {
   return `${getInfra().env.API_URL}/api/v1/social/oauth/callback/${platform.toLowerCase()}`;
 }
 
-export async function startOAuth(ctx: AuthContext, input: { clientId: string; platform: PlatformKey; redirectPath?: string; mock?: boolean }) {
+export async function startOAuth(ctx: AuthContext, input: { clientId: string; platform: PlatformKey; redirectPath?: string; mock?: boolean; replaceAccountId?: string }) {
   requirePermission(ctx, 'social_accounts:connect');
   await getClient(ctx, input.clientId);
-  const { db, social } = getInfra();
+  if (input.replaceAccountId) {
+    const target = await getInfra().db.socialAccount.findFirst({ where: { id: input.replaceAccountId, organizationId: ctx.organizationId, clientId: input.clientId } });
+    if (!target || !target.isMock || target.platform !== input.platform) throw badRequest('Only a mock account of the same platform and client can be replaced');
+    if (input.mock) throw badRequest('Replace a mock account with a real connection, not another mock');
+  }
+  const { db } = getInfra();
+  const social = await getSocial();
   const adapter = input.mock ? social.mock(input.platform) : social.realAdapter(input.platform);
   if (!adapter.isConfigured()) {
     throw new AppError('NOT_CONFIGURED', `${input.platform} is not configured on this server. See docs/integrations/${input.platform.toLowerCase()}.md`);
@@ -58,6 +65,7 @@ export async function startOAuth(ctx: AuthContext, input: { clientId: string; pl
       userId: ctx.userId,
       platform: input.platform,
       isMock: Boolean(input.mock),
+      replaceAccountId: input.replaceAccountId ?? null,
       codeVerifier: pkce.verifier,
       redirectPath: input.redirectPath,
       expiresAt: new Date(Date.now() + 10 * 60 * 1000),
@@ -72,7 +80,8 @@ export async function startOAuth(ctx: AuthContext, input: { clientId: string; pl
  * The state is single-use and bound to the organization, client and user that started the flow.
  */
 export async function completeOAuth(platform: PlatformKey, query: { state?: string; code?: string; error?: string; error_description?: string }): Promise<string> {
-  const { db, env, social, logger } = getInfra();
+  const { db, env, logger } = getInfra();
+  const social = await getSocial();
   const fail = (path: string, message: string) => `${env.APP_URL}${path}${path.includes('?') ? '&' : '?'}oauth_error=${encodeURIComponent(message)}`;
   if (!query.state) return fail('/social-accounts', 'Missing OAuth state');
 
@@ -93,7 +102,13 @@ export async function completeOAuth(platform: PlatformKey, query: { state?: stri
     const adapter = state.isMock ? social.mock(platform) : social.realAdapter(platform);
     const accounts = await adapter.handleOAuthCallback({ code: query.code, redirectUri: oauthRedirectUri(platform), codeVerifier: state.codeVerifier ?? undefined });
     const saved = await saveConnectedAccounts(ctx, state.clientId, platform, adapter, accounts);
-    return `${env.APP_URL}${back}${back.includes('?') ? '&' : '?'}connected=${saved.length}`;
+    let replaced = '';
+    if (state.replaceAccountId && saved[0] && !state.isMock) {
+      const { replaceMockAccount } = await import('./platform-credentials.service');
+      await replaceMockAccount(ctx, state.replaceAccountId, saved[0].id);
+      replaced = '&replaced=1';
+    }
+    return `${env.APP_URL}${back}${back.includes('?') ? '&' : '?'}connected=${saved.length}${replaced}`;
   } catch (error) {
     logger.warn({ platform, organizationId: state.organizationId, clientId: state.clientId, error: error instanceof Error ? error.message : String(error) }, 'OAuth callback failed');
     const message = error instanceof AppError || isSocialApiError(error) ? error.message : 'Could not complete the connection';
@@ -202,7 +217,8 @@ export interface LoadedAccount {
  * Internal use only (workers/services) — the result must never be returned to a client.
  */
 export async function loadAdapterAccount(organizationId: string, socialAccountId: string, opts: { skipRefresh?: boolean } = {}): Promise<LoadedAccount> {
-  const { db, social } = getInfra();
+  const { db } = getInfra();
+  const social = await getSocial();
   const record = await db.socialAccount.findFirst({ where: { id: socialAccountId, organizationId } });
   if (!record) throw notFound('Social account');
   if (record.status === 'DISCONNECTED') throw badRequest('This social account is disconnected');

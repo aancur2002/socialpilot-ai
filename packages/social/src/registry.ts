@@ -20,6 +20,15 @@ export interface SocialRegistryConfig {
   tiktok: { clientId?: string; clientSecret?: string };
 }
 
+/** Credential overrides for one platform (e.g. saved from the admin dashboard). */
+export interface PlatformCredentialOverride {
+  clientId?: string;
+  clientSecret?: string;
+  webhookVerifyToken?: string;
+  configId?: string;
+  organizationScopes?: boolean;
+}
+
 export interface PlatformStatus {
   platform: PlatformKey;
   implemented: boolean;
@@ -40,17 +49,40 @@ export class SocialAdapterRegistry {
   private readonly mocks = new Map<PlatformKey, MockSocialAdapter>();
 
   constructor(private readonly config: SocialRegistryConfig) {
-    const v = config.metaGraphVersion;
-    this.real.set('FACEBOOK', new FacebookAdapter({ ...config.facebook, graphVersion: v }));
-    this.real.set('INSTAGRAM', new InstagramAdapter({ ...config.instagram, graphVersion: v }));
-    this.real.set('WHATSAPP', new WhatsAppAdapter({ ...config.whatsapp, graphVersion: v }));
-    this.real.set('LINKEDIN', new LinkedInAdapter(config.linkedin));
-    this.real.set('TIKTOK', new TikTokAdapter(config.tiktok));
+    this.buildRealAdapters({});
     if (config.mockEnabled) {
       for (const p of IMPLEMENTED_PLATFORMS) {
         this.mocks.set(p, new MockSocialAdapter(p, { apiUrl: config.apiUrl, webhookSecret: config.mockWebhookSecret }));
       }
     }
+  }
+
+  private buildRealAdapters(overrides: Partial<Record<PlatformKey, PlatformCredentialOverride>>) {
+    const c = this.config;
+    const v = c.metaGraphVersion;
+    const merge = <T extends object>(base: T, o: PlatformCredentialOverride | undefined): T => {
+      if (!o) return base;
+      const defined = Object.fromEntries(Object.entries(o).filter(([, value]) => value !== undefined && value !== null && value !== ''));
+      return { ...base, ...defined };
+    };
+    this.real.set('FACEBOOK', new FacebookAdapter({ ...merge(c.facebook, overrides.FACEBOOK), graphVersion: v }));
+    this.real.set('INSTAGRAM', new InstagramAdapter({ ...merge(c.instagram, overrides.INSTAGRAM), graphVersion: v }));
+    this.real.set('WHATSAPP', new WhatsAppAdapter({ ...merge(c.whatsapp, overrides.WHATSAPP), graphVersion: v }));
+    this.real.set('LINKEDIN', new LinkedInAdapter(merge(c.linkedin, overrides.LINKEDIN)));
+    this.real.set('TIKTOK', new TikTokAdapter(merge(c.tiktok, overrides.TIKTOK)));
+  }
+
+  /**
+   * Applies credential overrides (e.g. saved in the admin dashboard) on top of the
+   * environment configuration. Fields left undefined keep their environment value.
+   */
+  configure(overrides: Partial<Record<PlatformKey, PlatformCredentialOverride>>): void {
+    this.buildRealAdapters(overrides);
+  }
+
+  /** The environment-provided configuration, used to show where each value comes from. */
+  get baseConfig(): SocialRegistryConfig {
+    return this.config;
   }
 
   get mockEnabled(): boolean {

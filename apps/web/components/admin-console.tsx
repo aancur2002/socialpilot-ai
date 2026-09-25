@@ -2,6 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
+import { IntegrationsSetup } from './integrations-setup';
 import { ago, humanize, PlatformChip, when } from '@/components/domain';
 import { Badge, EmptyState, ErrorState, PageHeader, Panel, PanelHeader, Skeleton, Table, Tabs, Td, Th } from '@/components/ui/primitives';
 import { api } from '@/lib/api';
@@ -16,8 +17,10 @@ interface Overview {
 interface QueueInfo { name: string; counts: Record<string, number>; recentFailures: { id: string; attemptsMade: number; failedReason?: string; timestamp: number }[] }
 interface Health { status: string; checks: Record<string, { ok: boolean; latencyMs?: number; detail?: string }> }
 
-export function AdminConsole({ enabled }: { enabled: boolean }) {
-  const [tab, setTab] = useState<'overview' | 'orgs' | 'users' | 'queues' | 'audit'>('overview');
+type AdminTab = 'overview' | 'integrations' | 'orgs' | 'users' | 'queues' | 'audit';
+
+export function AdminConsole({ enabled, initialTab = 'overview' }: { enabled: boolean; initialTab?: AdminTab }) {
+  const [tab, setTab] = useState<AdminTab>(initialTab);
   const overview = useQuery({ queryKey: ['admin', 'overview'], queryFn: () => api<Overview>('/admin/overview'), enabled });
   const health = useQuery({ queryKey: ['admin', 'health'], queryFn: () => api<Health>('/admin/health'), enabled, refetchInterval: 15_000 });
   const orgs = useQuery({ queryKey: ['admin', 'orgs'], queryFn: () => api<{ id: string; name: string; plan: string; createdAt: string; _count: { members: number; clients: number } }[]>('/admin/organizations'), enabled: enabled && tab === 'orgs' });
@@ -35,9 +38,9 @@ export function AdminConsole({ enabled }: { enabled: boolean }) {
           {Object.entries(health.data.checks).map(([k, v]) => <Badge key={k} tone={v.ok ? 'clearance' : 'alert'} title={v.detail}>{humanize(k)} {v.ok ? `${v.latencyMs}ms` : 'down'}</Badge>)}
         </div>
       )}
-      <div className="mb-4"><Tabs value={tab} onChange={setTab} items={[{ value: 'overview', label: 'Overview' }, { value: 'orgs', label: 'Organizations' }, { value: 'users', label: 'Users' }, { value: 'queues', label: 'Queues' }, { value: 'audit', label: 'Audit' }]} /></div>
+      <div className="mb-4"><Tabs value={tab} onChange={setTab} items={[{ value: 'overview', label: 'Overview' }, { value: 'integrations', label: 'Integrations' }, { value: 'orgs', label: 'Organizations' }, { value: 'users', label: 'Users' }, { value: 'queues', label: 'Queues' }, { value: 'audit', label: 'Audit' }]} /></div>
       {tab === 'overview' && (overview.isLoading ? <Skeleton className="h-48" /> : overview.error ? <ErrorState error={overview.error} /> : overview.data && (
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
           <Panel>
             <PanelHeader title="Totals" />
             <dl className="grid grid-cols-2 gap-px bg-line">{Object.entries(overview.data.totals).map(([k, v]) => <div key={k} className="bg-surface px-5 py-3"><dt className="text-xs text-ink-3">{humanize(k.replace(/([A-Z])/g, '_$1'))}</dt><dd className="text-lg font-semibold tabular-nums">{v}</dd></div>)}</dl>
@@ -64,6 +67,7 @@ export function AdminConsole({ enabled }: { enabled: boolean }) {
           </Panel>
         </div>
       ))}
+      {tab === 'integrations' && <IntegrationsSetup />}
       {tab === 'orgs' && <Panel><Table><thead><tr><Th>Organization</Th><Th>Plan</Th><Th className="text-right">Members</Th><Th className="text-right">Clients</Th><Th>Created</Th></tr></thead><tbody>{orgs.data?.map((o) => <tr key={o.id}><Td className="font-medium">{o.name}</Td><Td>{humanize(o.plan)}</Td><Td className="text-right tabular-nums">{o._count.members}</Td><Td className="text-right tabular-nums">{o._count.clients}</Td><Td className="text-ink-2">{ago(o.createdAt)}</Td></tr>)}</tbody></Table></Panel>}
       {tab === 'users' && <Panel><Table><thead><tr><Th>User</Th><Th>Organizations</Th><Th>Last sign-in</Th></tr></thead><tbody>{users.data?.map((u) => <tr key={u.id}><Td><span className="font-medium">{u.name}</span> {u.isSuperAdmin && <Badge tone="sky">Admin</Badge>}<p className="text-xs text-ink-3">{u.email}</p></Td><Td className="tabular-nums">{u._count.memberships}</Td><Td className="text-ink-2">{u.lastLoginAt ? ago(u.lastLoginAt) : 'Never'}</Td></tr>)}</tbody></Table></Panel>}
       {tab === 'queues' && (

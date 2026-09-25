@@ -1,6 +1,7 @@
 import { forbidden } from '../errors';
 import { getInfra } from '../infra';
 import { readinessReport } from '../health';
+import { getSocial } from './platform-credentials.service';
 
 /**
  * Super-admin (platform operator) views. Deliberately exposes counts and
@@ -28,7 +29,7 @@ export async function adminOverview(user: { isSuperAdmin: boolean }) {
     totals: { organizations, users, clients, socialAccounts, aiGenerations30d: aiGenerations, failedWebhooks: webhookFailed },
     integrations: byPlatform.map((r) => ({ platform: r.platform, status: r.status, isMock: r.isMock, count: r._count._all })),
     aiUsage: aiByStatus.map((r) => ({ provider: r.provider, status: r.status, count: r._count._all, inputTokens: r._sum.inputTokens ?? 0, outputTokens: r._sum.outputTokens ?? 0 })),
-    platforms: getInfra().social.statuses().map((s) => ({ platform: s.platform, implemented: s.implemented, configured: s.configured, verification: s.verification })),
+    platforms: (await getSocial()).statuses().map((s) => ({ platform: s.platform, implemented: s.implemented, configured: s.configured, verification: s.verification })),
   };
 }
 

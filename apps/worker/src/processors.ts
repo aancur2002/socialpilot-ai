@@ -3,6 +3,7 @@ import {
   deliverNotificationEmail,
   executePublish,
   getInfra,
+  getSocial,
   processInboundMessage,
   processKnowledgeSource,
   processWebhookEvent,
@@ -63,7 +64,8 @@ export async function analyticsProcessor(job: Job<JobPayloads['analytics']>) {
 }
 
 export async function maintenanceProcessor(job: Job<JobPayloads['maintenance']>) {
-  const { db, social, logger } = getInfra();
+  const { db, logger } = getInfra();
+  const social = await getSocial();
   switch (job.data.task) {
     case 'sweep-scheduled':
       return { enqueued: await sweepDueScheduledPosts() };

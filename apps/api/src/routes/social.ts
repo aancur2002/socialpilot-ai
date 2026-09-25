@@ -74,7 +74,7 @@ export async function webhookRoutes(app: FastifyInstance) {
   const handle = (mock: boolean) => ({
     challenge: async (req: import('fastify').FastifyRequest, reply: import('fastify').FastifyReply) => {
       const { platform } = parse(platformParam, req.params);
-      const answer = core.answerWebhookChallenge(platform, req.query as Record<string, string | undefined>, mock);
+      const answer = await core.answerWebhookChallenge(platform, req.query as Record<string, string | undefined>, mock);
       if (answer === null) return reply.status(403).send('Verification failed');
       return reply.type('text/plain').send(answer);
     },

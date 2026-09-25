@@ -1,10 +1,11 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { BookOpen, Plus, Search, Trash2 } from 'lucide-react';
+import { BookOpen, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { ago, humanize } from '@/components/domain';
+import { KnowledgeSourceDrawer } from '@/components/knowledge-source-drawer';
 import { ConfirmButton, Modal } from '@/components/ui/overlay';
 import { Badge, Button, EmptyState, ErrorState, Field, Input, PageHeader, Panel, PanelHeader, Select, Skeleton, Textarea } from '@/components/ui/primitives';
 import { api, errorMessage } from '@/lib/api';
@@ -20,6 +21,7 @@ export default function KnowledgePage() {
   const [form, setForm] = useState({ type: 'FAQ', title: '', content: '', url: '' });
   const [file, setFile] = useState<File | null>(null);
   const [query, setQuery] = useState('');
+  const [openSource, setOpenSource] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const sources = useQuery({ queryKey: ['knowledge', clientId], queryFn: () => api<KnowledgeSource[]>('/knowledge', { query: { clientId } }), enabled: Boolean(clientId), refetchInterval: (q) => (q.state.data?.some((s) => s.status === 'PENDING' || s.status === 'PROCESSING') ? 3000 : false) });
   const add = useMutation({
@@ -64,7 +66,7 @@ export default function KnowledgePage() {
       {!clientId ? (
         <Panel><EmptyState icon={<BookOpen className="h-8 w-8" />} title="Choose a client" /></Panel>
       ) : (
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_380px]">
+        <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[1fr_380px]">
           <Panel>
             {sources.isLoading && <div className="space-y-2 p-4">{[0, 1].map((i) => <Skeleton key={i} className="h-12" />)}</div>}
             {sources.error && <ErrorState error={sources.error} onRetry={() => sources.refetch()} />}
@@ -72,12 +74,15 @@ export default function KnowledgePage() {
             <ul className="divide-y divide-line">
               {sources.data?.map((s) => (
                 <li key={s.id} className="flex flex-wrap items-center gap-3 px-5 py-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium">{s.title}</p>
+                  <button className="min-w-0 flex-1 text-left" onClick={() => setOpenSource(s.id)}>
+                    <p className="font-medium hover:underline">{s.title}</p>
                     <p className="text-xs text-ink-3">{humanize(s.type)}, {s.chunkCount} passages, added {ago(s.createdAt)}{s.url ? `, ${s.url}` : ''}</p>
                     {s.error && <p className="text-xs text-alert">{s.error}</p>}
-                  </div>
+                  </button>
                   <Badge tone={STATUS_TONE[s.status]}>{humanize(s.status)}</Badge>
+                  <Button variant="ghost" size="sm" onClick={() => setOpenSource(s.id)}>
+                    <Pencil className="h-4 w-4" /> {can('knowledge:manage') ? 'View or edit' : 'View'}
+                  </Button>
                   {can('knowledge:manage') && (
                     <ConfirmButton variant="ghost" title="Remove this source?" description="The AI will no longer use it for replies." confirmLabel="Remove" onConfirm={async () => { await api(`/knowledge/${s.id}`, { method: 'DELETE' }); qc.invalidateQueries({ queryKey: ['knowledge'] }); }}>
                       <Trash2 className="h-4 w-4" />
@@ -87,7 +92,7 @@ export default function KnowledgePage() {
               ))}
             </ul>
           </Panel>
-          <Panel>
+          <Panel className="xl:sticky xl:top-20">
             <PanelHeader title="Test a question" description="See which passages the AI would read." />
             <div className="space-y-3 p-5">
               <div className="flex gap-2">
@@ -107,6 +112,7 @@ export default function KnowledgePage() {
           </Panel>
         </div>
       )}
+      <KnowledgeSourceDrawer sourceId={openSource} onClose={() => setOpenSource(null)} />
       <Modal open={open} onOpenChange={setOpen} title="Add knowledge" wide footer={<Button loading={add.isPending} disabled={!form.title.trim() || (isFile ? !file : form.type === 'WEBSITE' ? !form.url : !form.content.trim())} onClick={() => add.mutate()}>Add to knowledge base</Button>}>
         <div className="space-y-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

@@ -7,6 +7,7 @@ import { Suspense, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { humanize } from '@/components/domain';
 import { SocialAccountsPanel } from '@/components/social';
+import { TimezoneSelect } from '@/components/timezone-select';
 import { ConfirmButton } from '@/components/ui/overlay';
 import { Button, cn, ErrorState, Field, Input, PageHeader, Panel, PanelHeader, Select, Skeleton, Switch, Tabs, Textarea } from '@/components/ui/primitives';
 import { api, errorMessage } from '@/lib/api';
@@ -15,6 +16,32 @@ import type { BrandProfile, Client, ClientSettings } from '@/lib/types';
 
 const list = (s: string) => s.split(/\n|,/).map((x) => x.trim()).filter(Boolean);
 const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as const;
+
+function GeneralForm({ client }: { client: Client }) {
+  const qc = useQueryClient();
+  const { can } = useSession();
+  const [name, setName] = useState(client.name);
+  const [timezone, setTimezone] = useState(client.timezone);
+  const dirty = name !== client.name || timezone !== client.timezone;
+  const save = useMutation({
+    mutationFn: () => api<Client>(`/clients/${client.id}`, { method: 'PATCH', body: { name, timezone } }),
+    onSuccess: () => {
+      toast.success('Client updated');
+      qc.invalidateQueries({ queryKey: ['client', client.id] });
+      qc.invalidateQueries({ queryKey: ['clients'] });
+    },
+    onError: (e) => toast.error(errorMessage(e)),
+  });
+  return (
+    <Panel className="max-w-2xl">
+      <PanelHeader title="General" description="The timezone is used for scheduling, the calendar and business hours." actions={can('clients:edit') && <Button disabled={!dirty || !name.trim()} loading={save.isPending} onClick={() => save.mutate()}>Save changes</Button>} />
+      <div className="space-y-4 p-5">
+        <Field label="Client name" htmlFor="g-name"><Input id="g-name" value={name} disabled={!can('clients:edit')} onChange={(e) => setName(e.target.value)} /></Field>
+        <Field label="Timezone" htmlFor="g-tz"><TimezoneSelect id="g-tz" value={timezone} disabled={!can('clients:edit')} onChange={setTimezone} /></Field>
+      </div>
+    </Panel>
+  );
+}
 
 function BrandForm({ client }: { client: Client }) {
   const qc = useQueryClient();
@@ -209,7 +236,7 @@ function Workspace() {
   const router = useRouter();
   const qc = useQueryClient();
   const { can } = useSession();
-  const [tab, setTab] = useState<'brand' | 'ai' | 'accounts'>((params.get('tab') as 'brand' | 'ai' | 'accounts') ?? 'brand');
+  const [tab, setTab] = useState<'general' | 'brand' | 'ai' | 'accounts'>((params.get('tab') as 'general' | 'brand' | 'ai' | 'accounts') ?? 'general');
   const q = useQuery({ queryKey: ['client', id], queryFn: () => api<Client>(`/clients/${id}`) });
   if (q.isLoading) return <Skeleton className="h-96" />;
   if (q.error) return <ErrorState error={q.error} onRetry={() => q.refetch()} />;
@@ -227,7 +254,8 @@ function Workspace() {
           )
         }
       />
-      <div className="mb-4"><Tabs value={tab} onChange={setTab} items={[{ value: 'brand', label: 'Brand' }, { value: 'ai', label: 'AI settings' }, { value: 'accounts', label: 'Social accounts' }]} /></div>
+      <div className="mb-4"><Tabs value={tab} onChange={setTab} items={[{ value: 'general', label: 'General' }, { value: 'brand', label: 'Brand' }, { value: 'ai', label: 'AI settings' }, { value: 'accounts', label: 'Social accounts' }]} /></div>
+      {tab === 'general' && <GeneralForm key={c.updatedAt} client={c} />}
       {tab === 'brand' && <BrandForm client={c} />}
       {tab === 'ai' && c.settings && <AiSettingsForm client={c} />}
       {tab === 'accounts' && <SocialAccountsPanel clientId={c.id} />}

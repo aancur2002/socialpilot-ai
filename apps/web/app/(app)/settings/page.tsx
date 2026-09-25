@@ -6,6 +6,8 @@ import { Plus } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { ago, humanize, when } from '@/components/domain';
+import { AccountSettings } from '@/components/settings-account';
+import { AiModelSettings } from '@/components/settings-ai';
 import { ConfirmButton, Modal } from '@/components/ui/overlay';
 import { Badge, Button, EmptyState, Field, Input, PageHeader, Panel, PanelHeader, Select, Skeleton, Table, Tabs, Td, Th } from '@/components/ui/primitives';
 import { api, errorMessage } from '@/lib/api';
@@ -26,10 +28,45 @@ const ASSIGNABLE = ROLE_KEYS.filter((r) => r !== 'SUPER_ADMIN');
 
 interface AuditRow { id: string; action: string; resourceType: string; createdAt: string; ip: string | null; user: { name: string; email: string } | null }
 
+function ClientAccessEditor({ member, onClose }: { member: Member; onClose: () => void }) {
+  const { clients } = useSession();
+  const qc = useQueryClient();
+  const [access, setAccess] = useState<'ALL' | 'ASSIGNED'>(member.clientAccess);
+  const [ids, setIds] = useState<string[]>(member.clientIds);
+  const save = useMutation({
+    mutationFn: () => api(`/organizations/current/members/${member.id}`, { method: 'PATCH', body: { clientAccess: access, clientIds: access === 'ASSIGNED' ? ids : [] } }),
+    onSuccess: () => {
+      toast.success('Client access updated');
+      qc.invalidateQueries({ queryKey: ['members'] });
+      onClose();
+    },
+    onError: (e) => toast.error(errorMessage(e)),
+  });
+  return (
+    <Modal open onOpenChange={(o) => !o && onClose()} title={`Client access for ${member.user.name}`} footer={<Button loading={save.isPending} disabled={access === 'ASSIGNED' && ids.length === 0} onClick={() => save.mutate()}>Save access</Button>}>
+      <div className="space-y-4 text-sm">
+        <label className="flex items-start gap-2"><input type="radio" checked={access === 'ALL'} onChange={() => setAccess('ALL')} /> <span><span className="font-medium">All clients</span><span className="block text-ink-2">Including clients added later.</span></span></label>
+        <label className="flex items-start gap-2"><input type="radio" checked={access === 'ASSIGNED'} onChange={() => setAccess('ASSIGNED')} /> <span><span className="font-medium">Only selected clients</span></span></label>
+        {access === 'ASSIGNED' && (
+          <div className="grid gap-1 pl-6 sm:grid-cols-2">
+            {clients.map((c) => (
+              <label key={c.id} className="flex items-center gap-2">
+                <input type="checkbox" checked={ids.includes(c.id)} onChange={() => setIds((x) => (x.includes(c.id) ? x.filter((i) => i !== c.id) : [...x, c.id]))} />
+                {c.name}
+              </label>
+            ))}
+          </div>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
 function Members() {
   const { can, clients, me } = useSession();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<Member | null>(null);
   const [invite, setInvite] = useState({ email: '', role: 'CONTENT_MANAGER', clientIds: [] as string[] });
   const [link, setLink] = useState<string | null>(null);
   const q = useQuery({ queryKey: ['members'], queryFn: () => api<{ members: Member[]; invitations: { id: string; email: string; role: string; expiresAt: string }[] }>('/organizations/current/members') });
@@ -62,7 +99,12 @@ function Members() {
                   <Badge>{humanize(m.role)}</Badge>
                 )}
               </Td>
-              <Td className="text-sm text-ink-2">{m.role === 'ORG_OWNER' || m.role === 'ORG_ADMIN' || m.clientAccess === 'ALL' ? 'All clients' : m.clientIds.map((id) => clients.find((c) => c.id === id)?.name ?? 'Hidden client').join(', ') || 'None'}</Td>
+              <Td className="text-sm text-ink-2">
+                {m.role === 'ORG_OWNER' || m.role === 'ORG_ADMIN' || m.clientAccess === 'ALL' ? 'All clients' : m.clientIds.map((id) => clients.find((c) => c.id === id)?.name ?? 'Hidden client').join(', ') || 'None'}
+                {can('users:manage') && m.role !== 'ORG_OWNER' && m.role !== 'ORG_ADMIN' && m.user.id !== me.user.id && (
+                  <button className="ml-2 text-xs font-medium text-clearance hover:underline" onClick={() => setEditing(m)}>Change</button>
+                )}
+              </Td>
               <Td className="text-ink-2">{m.user.lastLoginAt ? ago(m.user.lastLoginAt) : 'Never'}</Td>
               <Td className="text-right">
                 {can('users:manage') && m.user.id !== me.user.id && (
@@ -84,6 +126,7 @@ function Members() {
           ))}
         </tbody>
       </Table>
+      {editing && <ClientAccessEditor member={editing} onClose={() => setEditing(null)} />}
       <Modal open={open} onOpenChange={setOpen} title="Invite a teammate" footer={link ? <Button onClick={() => setOpen(false)}>Done</Button> : <Button loading={send.isPending} disabled={!invite.email} onClick={() => send.mutate()}>Create invitation</Button>}>
         {link ? (
           <div className="space-y-2 text-sm">
@@ -146,16 +189,16 @@ function AuditLog() {
 export default function SettingsPage() {
   const { org, can } = useSession();
   const qc = useQueryClient();
-  const [tab, setTab] = useState<'general' | 'team' | 'audit'>('general');
+  const [tab, setTab] = useState<'general' | 'account' | 'ai' | 'team' | 'audit'>('general');
   const [name, setName] = useState(org.name);
   const save = useMutation({ mutationFn: () => api('/organizations/current', { method: 'PATCH', body: { name } }), onSuccess: () => { toast.success('Saved'); qc.invalidateQueries({ queryKey: ['org'] }); }, onError: (e) => toast.error(errorMessage(e)) });
   const usageRows: [string, string][] = [['clients', 'Clients'], ['socialAccounts', 'Social accounts'], ['members', 'Team members'], ['aiGenerations', 'AI generations this month'], ['posts', 'Posts this month'], ['messages', 'Messages this month']];
   return (
     <>
       <PageHeader title="Settings" description={`${org.name}, ${humanize(org.plan)} plan. Your role: ${humanize(org.role)}.`} />
-      <div className="mb-4"><Tabs value={tab} onChange={setTab} items={[{ value: 'general', label: 'General' }, ...(can('users:view') ? [{ value: 'team' as const, label: 'Team' }] : []), ...(can('audit:view') ? [{ value: 'audit' as const, label: 'Audit log' }] : [])]} /></div>
+      <div className="mb-4"><Tabs value={tab} onChange={setTab} items={[{ value: 'general', label: 'General' }, { value: 'account', label: 'Your account' }, ...(can('settings:manage') ? [{ value: 'ai' as const, label: 'AI models' }] : []), ...(can('users:view') ? [{ value: 'team' as const, label: 'Team' }] : []), ...(can('audit:view') ? [{ value: 'audit' as const, label: 'Audit log' }] : [])]} /></div>
       {tab === 'general' && (
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
           <Panel>
             <PanelHeader title="Organization" actions={can('settings:manage') && <Button loading={save.isPending} disabled={name === org.name || !name.trim()} onClick={() => save.mutate()}>Save</Button>} />
             <div className="p-5"><Field label="Name" htmlFor="o-name"><Input id="o-name" value={name} disabled={!can('settings:manage')} onChange={(e) => setName(e.target.value)} /></Field></div>
@@ -178,6 +221,8 @@ export default function SettingsPage() {
           </Panel>
         </div>
       )}
+      {tab === 'account' && <AccountSettings />}
+      {tab === 'ai' && <AiModelSettings />}
       {tab === 'team' && <Members />}
       {tab === 'audit' && <AuditLog />}
     </>

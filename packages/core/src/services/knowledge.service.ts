@@ -5,6 +5,7 @@ import { requirePermission, tenantWhere, type AuthContext, type ServiceContext }
 import { badRequest, notFound } from '../errors';
 import { getInfra } from '../infra';
 import { safeFetchText } from '../lib/safe-fetch';
+import { aiFor } from './ai-settings.service';
 import { audit } from './audit.service';
 import { getClient } from './client.service';
 
@@ -54,6 +55,55 @@ export async function createKnowledgeSource(ctx: AuthContext, input: { clientId:
   return source;
 }
 
+/**
+ * Edits a source. Editing the text of an uploaded document or web page makes your
+ * edited text the source from then on (the original file/URL is no longer re-read).
+ */
+export async function updateKnowledgeSource(ctx: AuthContext, id: string, input: { title?: string; content?: string }) {
+  requirePermission(ctx, 'knowledge:manage');
+  const { db, queues } = getInfra();
+  const source = await db.knowledgeSource.findFirst({ where: { id, ...tenantWhere(ctx) } });
+  if (!source) throw notFound('Knowledge source');
+  const contentChanged = input.content !== undefined && input.content !== source.content;
+  const updated = await db.knowledgeSource.update({
+    where: { id },
+    data: {
+      ...(input.title !== undefined ? { title: input.title } : {}),
+      ...(contentChanged ? { content: input.content, mediaId: null, url: null } : {}),
+    },
+  });
+  await audit(ctx, { action: 'knowledge.source_edited', resourceType: 'KnowledgeSource', resourceId: id, clientId: source.clientId, before: { title: source.title, length: source.content?.length ?? 0 }, after: { title: updated.title, length: updated.content?.length ?? 0, contentChanged } });
+  // Titles are embedded with each passage, so any edit re-indexes the source.
+  if (contentChanged || input.title !== undefined) {
+    await db.knowledgeSource.update({ where: { id }, data: { status: 'PENDING', error: null } });
+    await queues.add('knowledge', { sourceId: id }, { attempts: 3, backoff: { type: 'exponential', delay: 5000 } });
+  }
+  return getKnowledgeSource(ctx, id);
+}
+
+/** Re-reads the original file or page (if any) and rebuilds the passages. */
+export async function reprocessKnowledgeSource(ctx: AuthContext, id: string) {
+  requirePermission(ctx, 'knowledge:manage');
+  const { db, queues } = getInfra();
+  const source = await db.knowledgeSource.findFirst({ where: { id, ...tenantWhere(ctx) } });
+  if (!source) throw notFound('Knowledge source');
+  await db.knowledgeSource.update({ where: { id }, data: { status: 'PENDING', error: null } });
+  await queues.add('knowledge', { sourceId: id }, { attempts: 3, backoff: { type: 'exponential', delay: 5000 } });
+  await audit(ctx, { action: 'knowledge.source_reprocessed', resourceType: 'KnowledgeSource', resourceId: id, clientId: source.clientId });
+  return getKnowledgeSource(ctx, id);
+}
+
+/** Re-indexes every source the caller can manage — needed after changing the embedding model. */
+export async function reindexAllKnowledge(ctx: AuthContext, clientId?: string) {
+  requirePermission(ctx, 'knowledge:manage');
+  const { db, queues } = getInfra();
+  const sources = await db.knowledgeSource.findMany({ where: tenantWhere(ctx, clientId), select: { id: true } });
+  await db.knowledgeSource.updateMany({ where: { id: { in: sources.map((s) => s.id) } }, data: { status: 'PENDING', error: null } });
+  for (const s of sources) await queues.add('knowledge', { sourceId: s.id }, { attempts: 3, backoff: { type: 'exponential', delay: 5000 } });
+  await audit(ctx, { action: 'knowledge.reindexed', resourceType: 'KnowledgeSource', clientId: clientId ?? null, after: { count: sources.length } });
+  return { queued: sources.length };
+}
+
 export async function deleteKnowledgeSource(ctx: AuthContext, id: string) {
   requirePermission(ctx, 'knowledge:manage');
   const { db } = getInfra();
@@ -88,9 +138,10 @@ async function extractText(source: { type: KnowledgeSourceType; content: string 
 
 /** Worker: extract → chunk → embed → store vectors. Replaces previous chunks atomically. */
 export async function processKnowledgeSource(sourceId: string): Promise<void> {
-  const { db, embeddings, logger } = getInfra();
+  const { db, logger } = getInfra();
   const source = await db.knowledgeSource.findUnique({ where: { id: sourceId } });
   if (!source) return;
+  const { embeddings } = await aiFor(source.organizationId);
   await db.knowledgeSource.update({ where: { id: sourceId }, data: { status: 'PROCESSING', error: null } });
   try {
     const text = (await extractText(source)).trim();
@@ -132,7 +183,8 @@ export interface KnowledgeHit {
  * so knowledge can never be retrieved across tenants.
  */
 export async function searchKnowledgeInternal(organizationId: string, clientId: string, query: string, limit = 5, minScore = 0): Promise<KnowledgeHit[]> {
-  const { db, embeddings } = getInfra();
+  const { db } = getInfra();
+  const { embeddings } = await aiFor(organizationId);
   const [vector] = await embeddings.generateEmbeddings([query]);
   if (!vector) return [];
   const rows = await db.$queryRaw<{ id: string; sourceId: string; title: string; content: string; score: number }[]>(Prisma.sql`

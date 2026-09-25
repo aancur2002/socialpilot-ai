@@ -8,6 +8,7 @@ import { getInfra } from '../infra';
 import { paginate } from '../lib/util';
 import { audit } from './audit.service';
 import { generationLogger } from './ai-log.service';
+import { aiFor } from './ai-settings.service';
 import { getClient, getClientSettings } from './client.service';
 import { notifyClientMembers } from './notification.service';
 import { incrementUsage } from './organization.service';
@@ -221,7 +222,8 @@ export async function generateContent(ctx: AuthContext, input: GenerateContentIn
   const publishable = input.platforms.filter((p) => getPlatformCapabilities(p).publishing);
   if (!publishable.length) throw badRequest('None of the selected platforms supports publishing posts');
 
-  const { db, ai } = getInfra();
+  const { db } = getInfra();
+  const { ai } = await aiFor(ctx.organizationId);
   const previous = await db.content.findMany({ where: { clientId: client.id, organizationId: ctx.organizationId, deletedAt: null }, orderBy: { createdAt: 'desc' }, take: 5, select: { baseContent: true } });
   const agent = new ContentAgent(ai, generationLogger({ organizationId: ctx.organizationId, clientId: client.id, userId: ctx.userId }));
   let outcome;
@@ -276,7 +278,7 @@ export async function regenerateVariant(ctx: AuthContext, contentId: string, var
   if (!variant) throw notFound('Variant');
   const client = await getClient(ctx, content.clientId);
   const settings = await getClientSettings(ctx.organizationId, client.id);
-  const agent = new ContentAgent(getInfra().ai, generationLogger({ organizationId: ctx.organizationId, clientId: client.id, userId: ctx.userId }));
+  const agent = new ContentAgent((await aiFor(ctx.organizationId)).ai, generationLogger({ organizationId: ctx.organizationId, clientId: client.id, userId: ctx.userId }));
   const outcome = await agent.generate({
     brand: brandContext(client.brandProfile, client.name),
     topic: content.topic ?? content.title,

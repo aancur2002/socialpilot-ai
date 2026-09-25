@@ -9,7 +9,10 @@
 3. A phone number registered to a WhatsApp Business Account (WABA), and **business verification** to lift messaging limits.
 4. App Review for `whatsapp_business_management` and `whatsapp_business_messaging` if you onboard businesses you don't own. This is the Tech Provider path.
 
-## Environment
+## Credentials
+
+Enter them in **Platform admin → Integrations** (recommended: encrypted, no restart, with a credential check), or set the environment variables below. Values saved in the dashboard override the environment. The Integrations card also shows the exact redirect URI and webhook URL to copy into the developer console.
+
 
 | Variable | Value |
 |---|---|

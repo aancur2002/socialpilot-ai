@@ -16,6 +16,10 @@ import {
   updateContactSchema,
   updateConversationSchema,
   updateLeadSchema,
+  updateKnowledgeSourceSchema,
+  aiSettingsSchema,
+  platformSchema,
+  platformSetupSchema,
 } from '@socialpilot/validation';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
@@ -111,6 +115,14 @@ export async function knowledgeRoutes(app: FastifyInstance) {
     await core.deleteKnowledgeSource(await requireCtx(req), parse(idParam, req.params).id);
     return noContent(reply);
   });
+  app.patch('/knowledge/:id', { schema: { tags: ['knowledge'], body: doc(updateKnowledgeSourceSchema) } }, async (req) =>
+    core.updateKnowledgeSource(await requireCtx(req), parse(idParam, req.params).id, parse(updateKnowledgeSourceSchema, req.body)),
+  );
+  app.post('/knowledge/:id/reprocess', { schema: { tags: ['knowledge'] } }, async (req) => core.reprocessKnowledgeSource(await requireCtx(req), parse(idParam, req.params).id));
+  app.post('/knowledge/reindex', { schema: { tags: ['knowledge'] } }, async (req) => {
+    const body = parse(z.object({ clientId: z.string().optional() }), req.body);
+    return core.reindexAllKnowledge(await requireCtx(req), body.clientId);
+  });
   app.post('/knowledge/search', { schema: { tags: ['knowledge'], body: doc(knowledgeSearchSchema) } }, async (req) => core.searchKnowledge(await requireCtx(req), parse(knowledgeSearchSchema, req.body)));
 }
 
@@ -164,6 +176,14 @@ export async function analyticsRoutes(app: FastifyInstance) {
   app.get('/analytics/ai-usage', { schema: { tags: ['analytics'] } }, async (req) => core.aiUsageSummary(await requireCtx(req), parse(analyticsQuerySchema, req.query)));
 }
 
+export async function aiSettingsRoutes(app: FastifyInstance) {
+  app.get('/ai-settings', { schema: { tags: ['ai'] } }, async (req) => core.getAiSettings(await requireCtx(req)));
+  app.put('/ai-settings', { schema: { tags: ['ai'], body: doc(aiSettingsSchema) } }, async (req) => core.updateAiSettings(await requireCtx(req), parse(aiSettingsSchema, req.body)));
+  app.post('/ai-settings/test', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } }, schema: { tags: ['ai'], body: doc(aiSettingsSchema) } }, async (req) =>
+    core.testAiSettings(await requireCtx(req), parse(aiSettingsSchema, req.body)),
+  );
+}
+
 export async function adminRoutes(app: FastifyInstance) {
   app.get('/admin/overview', { schema: { tags: ['admin'] } }, async (req) => core.adminOverview(requireUser(req)));
   app.get('/admin/organizations', { schema: { tags: ['admin'] } }, async (req) => core.adminOrganizations(requireUser(req)));
@@ -171,4 +191,13 @@ export async function adminRoutes(app: FastifyInstance) {
   app.get('/admin/queues', { schema: { tags: ['admin'] } }, async (req) => core.adminQueues(requireUser(req)));
   app.get('/admin/audit-logs', { schema: { tags: ['admin'] } }, async (req) => core.adminAuditLogs(requireUser(req)));
   app.get('/admin/health', { schema: { tags: ['admin'] } }, async (req) => core.adminHealth(requireUser(req)));
+
+  const platformParam = z.object({ platform: z.string().transform((p) => p.toUpperCase()).pipe(platformSchema) });
+  app.get('/admin/integrations', { schema: { tags: ['admin'] } }, async (req) => core.listPlatformSetup(requireUser(req)));
+  app.put('/admin/integrations/:platform', { schema: { tags: ['admin'], body: doc(platformSetupSchema) } }, async (req) =>
+    core.savePlatformSetup(requireUser(req), parse(platformParam, req.params).platform, parse(platformSetupSchema, req.body)),
+  );
+  app.post('/admin/integrations/:platform/check', { config: { rateLimit: { max: 20, timeWindow: '1 minute' } }, schema: { tags: ['admin'] } }, async (req) =>
+    core.checkPlatformSetup(requireUser(req), parse(platformParam, req.params).platform),
+  );
 }

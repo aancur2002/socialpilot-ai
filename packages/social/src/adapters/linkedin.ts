@@ -56,6 +56,11 @@ export class LinkedInAdapter extends BaseAdapter {
     return this.config.organizationScopes ? [...member, 'r_organization_social', 'w_organization_social', 'rw_organization_admin'] : member;
   }
 
+  async checkAppCredentials(): Promise<{ ok: boolean | null; message: string }> {
+    this.requireConfigured();
+    return { ok: null, message: 'LinkedIn can’t verify app credentials without a user sign-in. Connect a test account to confirm they work.' };
+  }
+
   async getAuthorizationUrl(input: OAuthInput): Promise<string> {
     const { clientId } = this.requireConfigured();
     const url = new URL('https://www.linkedin.com/oauth/v2/authorization');

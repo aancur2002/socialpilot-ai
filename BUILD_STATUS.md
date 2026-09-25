@@ -7,7 +7,7 @@
 - **E**: Playwright browser E2E
 - **M**: manually run against the local stack (including screenshots)
 
-Last full run: `npm run typecheck` passed, `npm run lint` passed, `npm test` 116 passed, `npm run test:integration` 35 passed, `npm run build` passed, `npm run test:e2e` 4 passed (against production builds). The E2E suite also passed against the Docker images.
+Last full run: `npm run typecheck` passed, `npm run lint` passed, `npm test` 116 passed, `npm run test:integration` 52 passed, `npm run build` passed, `npm run test:e2e` 4 passed (against production builds). The E2E suite also passed against the Docker images.
 
 ## Phase 1: Foundation
 - [x] Monorepo (npm workspaces + Turborepo), strict TypeScript, ESLint (incl. react-hooks). **M**
@@ -15,6 +15,7 @@ Last full run: `npm run typecheck` passed, `npm run lint` passed, `npm test` 116
 - [x] Postgres + pgvector, Prisma schema, migrations, HNSW index. **I**
 - [x] Redis + BullMQ queues and worker. **I**, **M**
 - [x] Authentication (scrypt passwords, hashed session tokens, httpOnly cookies). **U**, **I**, **E**
+- [x] Account settings: profile name and password change (signs out other sessions). **I**, **M**
 - [x] Organizations, members, invitations. **I**
 - [x] RBAC (9 roles, permission matrix, role-escalation guards, client scoping). **U**, **I**, **E**
 - [x] Tenant isolation in the service layer. **I**
@@ -22,20 +23,24 @@ Last full run: `npm run typecheck` passed, `npm run lint` passed, `npm test` 116
 - [x] Health `/health` and readiness `/ready` (database, Redis, storage, worker heartbeat). **I**, **M**
 
 ## Phase 2: Clients and social
-- [x] Clients, brand profiles, per-client AI settings, business hours. **I**, **E**
+- [x] Clients, brand profiles, per-client AI settings, business hours; searchable timezone picker. **I**, **E**, **M**
 - [x] Social adapter interface, capability matrix, normalized errors. **U**
 - [x] OAuth architecture (single-use state, PKCE, encrypted token storage, refresh, revoke, key rotation). **U**, **I**, **E** (mock flow)
 - [x] Mock providers (MockFacebook, MockInstagram, MockWhatsApp, MockLinkedIn, MockTikTok), refused in production. **U**, **I**, **E**
 - [x] Platform status and capability UI. **M**
+- [x] Platform app credentials managed in the admin dashboard (encrypted, override .env, credential check for Meta and TikTok). **I**, **M**
+- [x] Switch a mock account to a real account, moving its platform versions and scheduled posts. **I**
 - [x] Platform admin console (aggregate views; super admins need membership to enter a workspace). **I**, **E**
 
 ## Phase 3: Content and AI
 - [x] AI provider abstraction (Anthropic, OpenAI-compatible, mock) and embeddings. **U**
+- [x] Per-organization AI model settings (provider, models, encrypted keys, connection test, re-index prompt). **I**, **M**
 - [~] Anthropic provider against the live API. Written against the official SDK and typechecked, not called with a real key.
 - [x] Versioned prompts, zod-validated structured output, retry, generation logs. **U**, **I**
 - [x] ContentAgent (per-platform variants, missing-information flagging). **I**, **E**
 - [x] Content CRUD, variants, media upload (magic-byte validation). **I**, **M**
 - [x] Knowledge base (manual, FAQ, text, PDF, website with SSRF guard), chunking, embeddings, client-isolated vector search. **U**, **I**, **M**
+- [x] Knowledge editing (title and text), re-index, refresh from original file or page. **I**, **M**
 
 ## Phase 4: Calendar and publishing
 - [x] Approval workflow (submit, approve, reject, request changes, re-approval after edits). **I**, **E**

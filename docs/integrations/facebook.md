@@ -9,7 +9,10 @@
 3. **Business verification** for the Meta business that owns the app. Advanced Access to the Page permissions requires it.
 4. **App Review** for every permission below at Advanced Access, before users outside your business can connect Pages. It needs a screencast of each permission in use and a privacy policy URL.
 
-## Environment
+## Credentials
+
+Enter them in **Platform admin → Integrations** (recommended: encrypted, no restart, with a credential check), or set the environment variables below. Values saved in the dashboard override the environment. The Integrations card also shows the exact redirect URI and webhook URL to copy into the developer console.
+
 
 | Variable | Value |
 |---|---|

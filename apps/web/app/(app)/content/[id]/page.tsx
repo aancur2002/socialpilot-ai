@@ -236,7 +236,7 @@ export default function ContentDetailPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_340px]">
+      <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[1fr_340px]">
         <div className="space-y-4">
           {c.variants.map((v) => (
             <VariantEditor key={v.id} content={c} variant={v} accounts={accounts.data ?? []} caps={platforms.data?.platforms.find((p) => p.platform === v.platform)} editable={editable} onSaved={setData} />

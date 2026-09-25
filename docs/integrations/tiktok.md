@@ -9,7 +9,10 @@
 3. **App audit.** Until TikTok audits the app, direct posts are restricted to **private (`SELF_ONLY`) visibility**, and only a limited number of users can authorize it. The adapter reads the privacy levels TikTok allows for each creator and uses the most public one available.
 4. TikTok's content-sharing guidelines require specific UX before posting: showing the creator's nickname, letting them choose privacy, and interaction toggles. **Our UI doesn't implement that consent screen yet** (TODO). Build it before applying for the audit.
 
-## Environment
+## Credentials
+
+Enter them in **Platform admin → Integrations** (recommended: encrypted, no restart, with a credential check), or set the environment variables below. Values saved in the dashboard override the environment. The Integrations card also shows the exact redirect URI and webhook URL to copy into the developer console.
+
 
 | Variable | Value |
 |---|---|
