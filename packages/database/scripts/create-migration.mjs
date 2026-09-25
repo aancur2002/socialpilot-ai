@@ -11,7 +11,7 @@ if (!name || !/^[a-z0-9_]+$/.test(name)) {
   console.error('Usage: create-migration <snake_case_name>');
   process.exit(1);
 }
-execFileSync('npx', ['prisma', 'migrate', 'dev', '--create-only', '--name', name], { stdio: 'inherit' });
+execFileSync('node', ['scripts/prisma.mjs', 'migrate', 'dev', '--create-only', '--name', name], { stdio: 'inherit' });
 const dir = join(process.cwd(), 'prisma', 'migrations');
 const latest = readdirSync(dir).filter((d) => d.endsWith(`_${name}`)).sort().at(-1);
 if (!latest) process.exit(0);

@@ -1,4 +1,4 @@
-import { readinessReport } from '@socialpilot/core';
+import { getInfra, readinessReport } from '@socialpilot/core';
 import type { FastifyInstance } from 'fastify';
 import { authRoutes } from './auth';
 import { contentRoutes, localMediaRoutes } from './content';
@@ -7,6 +7,13 @@ import { organizationRoutes } from './organization';
 import { socialRoutes, webhookRoutes } from './social';
 
 export async function registerRoutes(app: FastifyInstance) {
+  /** The API has no UI: send browsers to the web app, give API clients pointers. */
+  app.get('/', { schema: { hide: true } }, async (req, reply) => {
+    const { env } = getInfra();
+    if ((req.headers.accept ?? '').includes('text/html')) return reply.redirect(env.APP_URL);
+    return { name: 'SocialPilot AI API', app: env.APP_URL, docs: `${env.API_URL}/docs`, health: '/health', ready: '/ready', api: '/api/v1' };
+  });
+
   /** Liveness: the process is up. */
   app.get('/health', { schema: { tags: ['health'] } }, async () => ({ status: 'ok', time: new Date().toISOString() }));
 

@@ -2,6 +2,10 @@
 
 **"Invalid environment configuration" at startup.** The message lists every bad variable. Common causes: `ENCRYPTION_KEY` isn't 32 bytes of base64, `JWT_SECRET` is shorter than 32 characters, or `AI_API_KEY` is missing for a non-mock provider.
 
+**`Environment variable not found: DATABASE_URL` when running `npm run db:migrate`.** The Prisma scripts load the repo-root `.env` through `packages/database/scripts/prisma.mjs`. Make sure `.env` exists at the repo root (`cp env.example .env`), or export `DATABASE_URL`. Don't call `npx prisma …` directly from `packages/database`, because Prisma only reads a `.env` next to that package.
+
+**Opening http://localhost:4000 shows JSON or redirects.** That's the API. The app is at http://localhost:3000.
+
 **`prisma migrate dev` wants to reset the database.** It reports the pgvector HNSW index as drift. Use `npm run db:migrate` (deploy) and `npm run db:migrate:new -- <name>`, as described in [database.md](database.md).
 
 **Install scripts skipped (npm 11 `allow-scripts` warning).** Only the packages under `allowScripts` in `package.json` run install scripts. If Prisma complains about missing engines, run `npm rebuild prisma @prisma/engines @prisma/client`.

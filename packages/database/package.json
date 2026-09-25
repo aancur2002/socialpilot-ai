@@ -8,9 +8,9 @@
   },
   "scripts": {
     "generate": "prisma generate",
-    "migrate:dev": "prisma migrate deploy",
-    "migrate:deploy": "prisma migrate deploy",
-    "reset": "prisma migrate reset --force --skip-seed",
+    "migrate:dev": "node scripts/prisma.mjs migrate deploy",
+    "migrate:deploy": "node scripts/prisma.mjs migrate deploy",
+    "reset": "node scripts/prisma.mjs migrate reset --force --skip-seed",
     "typecheck": "tsc -p tsconfig.json",
     "migrate:new": "node scripts/create-migration.mjs"
   },
