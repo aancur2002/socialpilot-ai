@@ -372,6 +372,21 @@ export const aiSettingsSchema = z.object({
   embeddingProvider: z.enum(EMBEDDING_PROVIDERS).nullable().optional(),
   embeddingModel: modelId.nullable().optional(),
   embeddingApiKey: z.string().trim().min(8).max(500).nullable().optional(),
+  /**
+   * Backup text providers, tried in order when the primary fails. The whole list is
+   * replaced; per row, apiKey undefined keeps that provider's saved key, null removes it.
+   */
+  fallbacks: z
+    .array(
+      z.object({
+        provider: z.enum(AI_PROVIDERS),
+        model: modelId.nullable().optional(),
+        fastModel: modelId.nullable().optional(),
+        apiKey: z.string().trim().min(8).max(500).nullable().optional(),
+      }),
+    )
+    .max(3)
+    .optional(),
 });
 export type AiSettingsInput = z.infer<typeof aiSettingsSchema>;
 

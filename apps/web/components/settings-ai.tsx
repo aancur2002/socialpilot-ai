@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CheckCircle2, PlugZap, XCircle } from 'lucide-react';
+import { ArrowDown, ArrowUp, CheckCircle2, ListRestart, Plus, PlugZap, Trash2, XCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { api, errorMessage } from '@/lib/api';
@@ -17,16 +17,27 @@ interface AiSettingsView {
     embeddingModel: string | null;
     apiKey: { set: boolean; hint: string | null };
     embeddingApiKey: { set: boolean; hint: string | null };
+    fallbacks: { provider: string; model: string | null; fastModel: string | null; apiKey: { set: boolean; hint: string | null } }[];
   };
-  effective: { provider: string; model: string; fastModel: string; embeddingProvider: string; embeddingModel: string; apiKeySource: 'organization' | 'server' | 'none' };
+  effective: { provider: string; model: string; fastModel: string; embeddingProvider: string; embeddingModel: string; apiKeySource: 'organization' | 'server' | 'none'; chain: { provider: string; model: string }[] };
   serverDefaults: { provider: string; model: string | null; fastModel: string | null; embeddingProvider: string };
   mockAllowed: boolean;
   suggestions: Record<'anthropic' | 'openai' | 'google' | 'nvidia', string[]> & { embeddings: Record<'openai' | 'google' | 'nvidia', string[]> };
   reindexRequired?: boolean;
 }
 
+interface BackupRow {
+  provider: string;
+  model: string;
+  fastModel: string;
+  apiKey: string;
+  removeKey: boolean;
+  saved: { set: boolean; hint: string | null };
+}
+
 interface TestResult {
   text: { ok: boolean; model?: string; latencyMs?: number; error?: string };
+  chain?: { provider: string; role: 'primary' | 'backup'; ok: boolean; model?: string; latencyMs?: number; error?: string }[];
   embeddings: { ok: boolean; model?: string; dimensions?: number; latencyMs?: number; error?: string };
 }
 
@@ -70,6 +81,28 @@ export function AiModelSettings() {
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ['ai-settings'], queryFn: () => api<AiSettingsView>('/ai-settings') });
   const [f, setF] = useState({ provider: '', model: '', fastModel: '', baseUrl: '', apiKey: '', removeKey: false, embeddingProvider: '', embeddingModel: '', embeddingApiKey: '', removeEmbeddingKey: false });
+  const [backups, setBackups] = useState<BackupRow[]>([]);
+  /** Live model lists loaded from providers, keyed by "text:provider" or "embedding:provider" */
+  const [liveModels, setLiveModels] = useState<Record<string, string[]>>({});
+  const loadModels = useMutation({
+    mutationFn: (v: { provider: string; apiKey?: string; purpose: 'text' | 'embedding' }) => api<{ models: string[] }>('/ai-settings/models', { body: { provider: v.provider, purpose: v.purpose, ...(v.apiKey?.trim() ? { apiKey: v.apiKey.trim() } : {}) } }),
+    onSuccess: (r, v) => {
+      setLiveModels((m) => ({ ...m, [`${v.purpose}:${v.provider}`]: r.models }));
+      toast.success(r.models.length ? `Loaded ${r.models.length} models from ${PROVIDER_NAMES[v.provider] ?? v.provider}. Pick one from the list.` : 'The provider returned no models for this key');
+    },
+    onError: (e) => toast.error(errorMessage(e)),
+  });
+  const modelsFor = (purpose: 'text' | 'embedding', p: string, fallback: string[]) => liveModels[`${purpose}:${p}`] ?? fallback;
+  const LoadModels = ({ purpose, p, apiKey }: { purpose: 'text' | 'embedding'; p: string; apiKey?: string }) => (
+    <button
+      type="button"
+      className="inline-flex items-center gap-1 text-xs font-medium text-clearance hover:underline disabled:opacity-50"
+      disabled={loadModels.isPending}
+      onClick={() => loadModels.mutate({ provider: p, apiKey, purpose })}
+    >
+      <ListRestart className="h-3.5 w-3.5" /> {liveModels[`${purpose}:${p}`] ? 'Reload models' : 'Load models from provider'}
+    </button>
+  );
   const [test, setTest] = useState<TestResult | null>(null);
   const [reindex, setReindex] = useState(false);
 
@@ -77,6 +110,7 @@ export function AiModelSettings() {
     if (!q.data) return;
     const s = q.data.saved;
     setF({ provider: s.provider ?? '', model: s.model ?? '', fastModel: s.fastModel ?? '', baseUrl: s.baseUrl ?? '', apiKey: '', removeKey: false, embeddingProvider: s.embeddingProvider ?? '', embeddingModel: s.embeddingModel ?? '', embeddingApiKey: '', removeEmbeddingKey: false });
+    setBackups(s.fallbacks.map((b) => ({ provider: b.provider, model: b.model ?? '', fastModel: b.fastModel ?? '', apiKey: '', removeKey: false, saved: b.apiKey })));
   }, [q.data]);
 
   const payload = () => ({
@@ -88,6 +122,12 @@ export function AiModelSettings() {
     embeddingModel: f.embeddingModel.trim() || null,
     ...(f.removeKey ? { apiKey: null } : f.apiKey.trim() ? { apiKey: f.apiKey.trim() } : {}),
     ...(f.removeEmbeddingKey ? { embeddingApiKey: null } : f.embeddingApiKey.trim() ? { embeddingApiKey: f.embeddingApiKey.trim() } : {}),
+    fallbacks: backups.map((b) => ({
+      provider: b.provider,
+      model: b.model.trim() || null,
+      fastModel: b.fastModel.trim() || null,
+      ...(b.removeKey ? { apiKey: null } : b.apiKey.trim() ? { apiKey: b.apiKey.trim() } : {}),
+    })),
   });
 
   const save = useMutation({
@@ -114,8 +154,23 @@ export function AiModelSettings() {
   if (q.error) return <ErrorState error={q.error} onRetry={() => q.refetch()} />;
   const d = q.data!;
   const provider = f.provider || d.serverDefaults.provider;
-  const suggestions = provider === 'mock' ? [] : (d.suggestions[provider as 'anthropic'] ?? []);
+  const suggestions = provider === 'mock' ? [] : modelsFor('text', provider, d.suggestions[provider as 'anthropic'] ?? []);
   const embeddingProvider = f.embeddingProvider || d.serverDefaults.embeddingProvider;
+  const allProviders = ['anthropic', 'openai', 'google', 'nvidia', ...(d.mockAllowed ? ['mock'] : [])];
+  const usedBy = (i: number) => new Set([provider, ...backups.filter((_, j) => j !== i).map((b) => b.provider)]);
+  const updateBackup = (i: number, patch: Partial<BackupRow>) => setBackups((rows) => rows.map((r, j) => (j === i ? { ...r, ...patch } : r)));
+  const moveBackup = (i: number, dir: -1 | 1) =>
+    setBackups((rows) => {
+      const next = [...rows];
+      const [row] = next.splice(i, 1);
+      next.splice(i + dir, 0, row!);
+      return next;
+    });
+  const addBackup = () => {
+    // Suggest the free options first.
+    const free = ['nvidia', 'google', 'openai', 'anthropic'].find((p) => !usedBy(-1).has(p));
+    if (free) setBackups((rows) => [...rows, { provider: free, model: '', fastModel: '', apiKey: '', removeKey: false, saved: { set: false, hint: null } }]);
+  };
 
   return (
     <div className="space-y-6">
@@ -127,6 +182,17 @@ export function AiModelSettings() {
           <div className="bg-surface px-5 py-3"><dt className="text-xs text-ink-3">Fast model (classification)</dt><dd className="font-medium">{d.effective.fastModel}</dd></div>
           <div className="bg-surface px-5 py-3"><dt className="text-xs text-ink-3">Embeddings</dt><dd className="font-medium">{d.effective.embeddingModel}</dd></div>
         </dl>
+        {d.effective.chain.length > 1 && (
+          <p className="border-t border-line px-5 py-3 text-sm">
+            <span className="text-ink-3">Tried in order: </span>
+            {d.effective.chain.map((c, i) => (
+              <span key={c.provider}>
+                {i > 0 && <span className="text-ink-3">, then </span>}
+                <span className="font-medium">{PROVIDER_NAMES[c.provider] ?? c.provider}</span> <span className="text-ink-3">({c.model})</span>
+              </span>
+            ))}
+          </p>
+        )}
         <p className="px-5 py-3 text-xs text-ink-3">
           API key: {d.effective.apiKeySource === 'organization' ? 'saved for this organization' : d.effective.apiKeySource === 'server' ? 'from the server’s .env' : 'none needed (mock provider)'}.
         </p>
@@ -156,8 +222,9 @@ export function AiModelSettings() {
             </Field>
             {provider !== 'mock' && (
               <>
-                <Field label="Main model" htmlFor="ai-model" hint="Pick a suggestion or type any model ID your provider offers. Blank uses the provider default.">
+                <Field label="Main model" htmlFor="ai-model" hint="Pick from the list or type any model ID your provider offers. Blank uses the provider default.">
                   <Input id="ai-model" list="ai-model-options" value={f.model} placeholder={suggestions[0] ?? 'model-id'} onChange={(e) => setF({ ...f, model: e.target.value })} />
+                  <LoadModels purpose="text" p={provider} apiKey={f.apiKey} />
                 </Field>
                 <Field label="Fast model" htmlFor="ai-fast" hint="Used for quick tasks like intent detection. A smaller model lowers cost. Blank uses the main model.">
                   <Input id="ai-fast" list="ai-model-options" value={f.fastModel} onChange={(e) => setF({ ...f, fastModel: e.target.value })} />
@@ -190,7 +257,8 @@ export function AiModelSettings() {
               <>
                 <Field label="Embedding model" htmlFor="emb-model" hint="Vectors up to 1536 dimensions are stored as-is (smaller ones are padded without changing results). Blank uses the provider default.">
                   <Input id="emb-model" list="emb-model-options" value={f.embeddingModel} placeholder={d.suggestions.embeddings[embeddingProvider as 'openai']?.[0] ?? ''} onChange={(e) => setF({ ...f, embeddingModel: e.target.value })} />
-                  <datalist id="emb-model-options">{(d.suggestions.embeddings[embeddingProvider as 'openai'] ?? []).map((m) => <option key={m} value={m} />)}</datalist>
+                  <datalist id="emb-model-options">{modelsFor('embedding', embeddingProvider, d.suggestions.embeddings[embeddingProvider as 'openai'] ?? []).map((m) => <option key={m} value={m} />)}</datalist>
+                  <LoadModels purpose="embedding" p={embeddingProvider} apiKey={f.embeddingApiKey} />
                 </Field>
                 <KeyField id="emb-key" label="Embeddings API key" status={d.saved.embeddingApiKey} value={f.embeddingApiKey} onChange={(v) => setF({ ...f, embeddingApiKey: v })} remove={f.removeEmbeddingKey} onRemove={(v) => setF({ ...f, removeEmbeddingKey: v })} />
                 {embeddingProvider === provider && <p className="text-xs text-ink-3">Leave the key blank to reuse the text generation key.</p>}
@@ -201,13 +269,72 @@ export function AiModelSettings() {
         </Panel>
       </div>
 
+      <Panel>
+        <PanelHeader
+          title="Backup providers"
+          description="If the provider above fails (rate limit, used-up free quota, invalid key, outage or unusable answer), the same request goes to the next backup automatically. A provider that just failed is skipped for a minute."
+          actions={
+            <Button variant="secondary" size="sm" disabled={backups.length >= 3 || allProviders.filter((p) => p !== 'mock').every((p) => usedBy(-1).has(p))} onClick={addBackup}>
+              <Plus className="h-4 w-4" /> Add backup
+            </Button>
+          }
+        />
+        {backups.length === 0 ? (
+          <p className="px-5 py-4 text-sm text-ink-2">No backups. Add one so replies keep working when a free tier hits its limit, for example Google Gemini first and NVIDIA NIM as backup.</p>
+        ) : (
+          <ol className="divide-y divide-line">
+            {backups.map((b, i) => {
+              const options = allProviders.filter((p) => !usedBy(i).has(p));
+              const models = b.provider === 'mock' ? [] : modelsFor('text', b.provider, d.suggestions[b.provider as 'anthropic'] ?? []);
+              return (
+                <li key={`${b.provider}-${i}`} className="grid grid-cols-1 gap-4 px-5 py-4 lg:grid-cols-[auto_1fr_1fr_1fr_auto] lg:items-start">
+                  <span className="pt-8 text-sm font-medium text-ink-3">Backup {i + 1}</span>
+                  <Field label="Provider" htmlFor={`bk-p-${i}`}>
+                    <Select id={`bk-p-${i}`} value={b.provider} onChange={(e) => updateBackup(i, { provider: e.target.value, model: '', fastModel: '', apiKey: '', removeKey: false, saved: { set: false, hint: null } })}>
+                      {[b.provider, ...options.filter((o) => o !== b.provider)].map((p) => <option key={p} value={p}>{PROVIDER_NAMES[p] ?? p}</option>)}
+                    </Select>
+                    {KEY_HELP[b.provider] && <p className="text-xs text-ink-3">{KEY_HELP[b.provider]!.split('. ')[0]!.replace(/\.$/, '')}.</p>}
+                  </Field>
+                  {b.provider !== 'mock' ? (
+                    <>
+                      <Field label="Model" htmlFor={`bk-m-${i}`} hint="Blank uses the provider default.">
+                        <Input id={`bk-m-${i}`} list={`bk-models-${i}`} value={b.model} placeholder={models[0] ?? ''} onChange={(e) => updateBackup(i, { model: e.target.value })} />
+                        <datalist id={`bk-models-${i}`}>{models.map((m) => <option key={m} value={m} />)}</datalist>
+                        <LoadModels purpose="text" p={b.provider} apiKey={b.apiKey} />
+                      </Field>
+                      <KeyField id={`bk-k-${i}`} label="API key" status={b.saved} value={b.apiKey} onChange={(v) => updateBackup(i, { apiKey: v })} remove={b.removeKey} onRemove={(v) => updateBackup(i, { removeKey: v })} />
+                    </>
+                  ) : (
+                    <p className="pt-8 text-sm text-ink-2 lg:col-span-2">Offline mock provider, useful for trying failover without keys.</p>
+                  )}
+                  <div className="flex gap-1 lg:pt-6">
+                    <Button variant="ghost" size="icon" aria-label="Move up" disabled={i === 0} onClick={() => moveBackup(i, -1)}><ArrowUp className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" aria-label="Move down" disabled={i === backups.length - 1} onClick={() => moveBackup(i, 1)}><ArrowDown className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" aria-label="Remove backup" onClick={() => setBackups((rows) => rows.filter((_, j) => j !== i))}><Trash2 className="h-4 w-4" /></Button>
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
+        )}
+        <p className="border-t border-line px-5 py-3 text-xs text-ink-3">Knowledge search doesn’t fail over, because vectors from different models can’t be compared. It can reuse the key of any provider listed here.</p>
+      </Panel>
+
       <Panel className="flex flex-wrap items-center gap-3 p-4">
         <Button variant="secondary" loading={runTest.isPending} onClick={() => runTest.mutate()}><PlugZap className="h-4 w-4" /> Test connection</Button>
         <Button loading={save.isPending} onClick={() => save.mutate()}>Save AI settings</Button>
         <p className="text-xs text-ink-3">The test uses the values on this page without saving them. Keys are encrypted and can’t be viewed again.</p>
         {test && (
           <div className="w-full space-y-1 text-sm">
-            {(['text', 'embeddings'] as const).map((k) => (
+            {test.chain && test.chain.length > 1 && test.chain.map((c) => (
+              <p key={`${c.role}-${c.provider}`} className="flex flex-wrap items-center gap-2">
+                {c.ok ? <CheckCircle2 className="h-4 w-4 text-clearance" /> : <XCircle className="h-4 w-4 text-alert" />}
+                <span className="font-medium">{c.role === 'primary' ? 'Primary' : 'Backup'}: {PROVIDER_NAMES[c.provider] ?? c.provider}</span>
+                {c.model && <Badge>{c.model}</Badge>}
+                {c.ok ? <span className="text-ink-2">responded in {c.latencyMs} ms</span> : <span className="text-alert">{c.error}</span>}
+              </p>
+            ))}
+            {(test.chain && test.chain.length > 1 ? (['embeddings'] as const) : (['text', 'embeddings'] as const)).map((k) => (
               <p key={k} className="flex flex-wrap items-center gap-2">
                 {test[k].ok ? <CheckCircle2 className="h-4 w-4 text-clearance" /> : <XCircle className="h-4 w-4 text-alert" />}
                 <span className="font-medium">{k === 'text' ? 'Text generation' : 'Embeddings'}</span>

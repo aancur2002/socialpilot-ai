@@ -25,6 +25,8 @@ export interface GenerateTextResult {
   text: string;
   model: string;
   usage: TokenUsage;
+  /** Which provider answered (set when a failover chain is used) */
+  provider?: string;
 }
 
 export interface GenerateStructuredInput<S extends z.ZodType> extends GenerateTextInput {
@@ -42,6 +44,8 @@ export interface GenerateStructuredResult<T> {
   data: T;
   model: string;
   usage: TokenUsage;
+  /** Which provider answered (set when a failover chain is used) */
+  provider?: string;
 }
 
 /** Vendor-neutral LLM interface. The application never imports a vendor SDK directly. */
@@ -51,6 +55,8 @@ export interface AIProvider {
   generateText(input: GenerateTextInput): Promise<GenerateTextResult>;
   /** Output is validated against `schema`; throws AiOutputValidationError when it does not conform. */
   generateStructured<S extends z.ZodType>(input: GenerateStructuredInput<S>): Promise<GenerateStructuredResult<z.infer<S>>>;
+  /** Model IDs available to this key, where the provider can list them. */
+  listModels?(): Promise<string[]>;
 }
 
 /** Some embedding models encode questions and documents differently. */

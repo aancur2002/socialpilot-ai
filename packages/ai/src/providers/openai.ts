@@ -51,8 +51,8 @@ export const COMPATIBLE_PRESETS: Record<CompatibleProvider, Preset> = {
   google: {
     label: 'Google Gemini',
     baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
-    model: 'gemini-2.5-flash',
-    fastModel: 'gemini-2.5-flash-lite',
+    model: 'gemini-3.8-flash',
+    fastModel: 'gemini-3.1-flash-lite',
     embeddingModel: 'gemini-embedding-001',
     maxTokensParam: 'max_tokens',
     structured: 'negotiate',
@@ -74,13 +74,13 @@ export const COMPATIBLE_PRESETS: Record<CompatibleProvider, Preset> = {
 
 type FetchImpl = typeof fetch;
 
-async function compatibleFetch<T>(fetchImpl: FetchImpl, label: string, baseUrl: string, apiKey: string, path: string, body: unknown): Promise<T> {
+async function compatibleFetch<T>(fetchImpl: FetchImpl, label: string, baseUrl: string, apiKey: string, path: string, body?: unknown): Promise<T> {
   let res: Response;
   try {
     res = await fetchImpl(`${baseUrl.replace(/\/$/, '')}${path}`, {
-      method: 'POST',
-      headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
-      body: JSON.stringify(body),
+      method: body === undefined ? 'GET' : 'POST',
+      headers: { authorization: `Bearer ${apiKey}`, ...(body === undefined ? {} : { 'content-type': 'application/json' }) },
+      body: body === undefined ? undefined : JSON.stringify(body),
       signal: AbortSignal.timeout(120_000),
     });
   } catch {
@@ -90,8 +90,10 @@ async function compatibleFetch<T>(fetchImpl: FetchImpl, label: string, baseUrl: 
     // Include the provider's own error text (never the key) so the settings test is actionable.
     let detail = '';
     try {
-      const data = (await res.json()) as { error?: { message?: string } | string; detail?: string; message?: string };
-      const raw = typeof data.error === 'string' ? data.error : (data.error?.message ?? data.detail ?? data.message ?? '');
+      // Some services (e.g. Gemini) wrap the error object in an array.
+      const json = (await res.json()) as unknown;
+      const data = (Array.isArray(json) ? json[0] : json) as { error?: { message?: string } | string; detail?: string; message?: string } | undefined;
+      const raw = typeof data?.error === 'string' ? data.error : (data?.error?.message ?? data?.detail ?? data?.message ?? '');
       detail = raw ? `: ${String(raw).slice(0, 300)}` : '';
     } catch {
       detail = '';
@@ -161,6 +163,11 @@ export class OpenAIProvider implements AIProvider {
     return this.complete(input);
   }
 
+  /** Model IDs this key can use, straight from the service's /models endpoint. */
+  async listModels(): Promise<string[]> {
+    return listCompatibleModels(this.fetchImpl, this.preset.label, this.baseUrl, this.config.apiKey);
+  }
+
   /**
    * Structured output. OpenAI gets strict json_schema. Other services are negotiated:
    * json_schema → json_object → plain instructions, falling back only when the
@@ -209,6 +216,12 @@ export class OpenAIProvider implements AIProvider {
   }
 }
 
+/** Lists model IDs from an OpenAI-compatible /models endpoint (Gemini prefixes IDs with "models/"). */
+export async function listCompatibleModels(fetchImpl: FetchImpl, label: string, baseUrl: string, apiKey: string): Promise<string[]> {
+  const res = await compatibleFetch<{ data?: { id: string }[] }>(fetchImpl, label, baseUrl, apiKey, '/models');
+  return [...new Set((res.data ?? []).map((m) => m.id.replace(/^models\//, '')))].sort();
+}
+
 export const EMBEDDING_DIMENSIONS = 1536;
 
 /**
@@ -240,6 +253,10 @@ export class OpenAIEmbeddingProvider implements EmbeddingProvider {
     this.model = config.model ?? this.preset.embeddingModel;
     this.baseUrl = config.baseUrl ?? this.preset.baseUrl;
     this.fetchImpl = config.fetchImpl ?? ((...args) => fetch(...args));
+  }
+
+  async listModels(): Promise<string[]> {
+    return listCompatibleModels(this.fetchImpl, this.preset.label, this.baseUrl, this.config.apiKey);
   }
 
   async generateEmbeddings(texts: string[], purpose: EmbeddingPurpose = 'document'): Promise<number[][]> {

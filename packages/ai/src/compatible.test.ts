@@ -33,7 +33,7 @@ describe('OpenAI-compatible providers', () => {
     expect((calls[0]!.body.response_format as { type: string }).type).toBe('json_schema');
     expect((calls[1]!.body.response_format as { type: string }).type).toBe('json_object');
     expect(calls[1]!.body.max_tokens).toBeDefined(); // not max_completion_tokens
-    expect(calls[1]!.body.model).toBe('gemini-2.5-flash');
+    expect(calls[1]!.body.model).toBe('gemini-3.8-flash');
     // Second request skips the rejected mode.
     await call(p);
     expect((calls[2]!.body.response_format as { type: string }).type).toBe('json_object');
@@ -69,6 +69,17 @@ describe('OpenAI-compatible providers', () => {
     const { impl, calls } = fakeFetch([{ status: 401, body: { error: { message: 'API key not valid' } } }]);
     await expect(call(new OpenAIProvider({ apiKey: 'k', kind: 'google', fetchImpl: impl }))).rejects.toThrow(/Google Gemini API returned HTTP 401: API key not valid/);
     expect(calls).toHaveLength(1);
+  });
+
+  it('reads Gemini errors wrapped in an array (so a 404 names the missing model)', async () => {
+    const { impl } = fakeFetch([{ status: 404, body: [{ error: { code: 404, message: 'models/gemini-2.5-flash is not found for API version v1main' } }] }]);
+    await expect(new OpenAIProvider({ apiKey: 'k', kind: 'google', fetchImpl: impl }).generateText({ system: 's', messages: [{ role: 'user', content: 'x' }] })).rejects.toThrow(/HTTP 404: models\/gemini-2.5-flash is not found/);
+  });
+
+  it('lists models from /models, stripping the Gemini "models/" prefix', async () => {
+    const { impl, calls } = fakeFetch([{ status: 200, body: { data: [{ id: 'models/gemini-3.8-flash' }, { id: 'models/gemini-embedding-001' }, { id: 'models/gemini-3.8-flash' }] } }]);
+    expect(await new OpenAIProvider({ apiKey: 'k', kind: 'google', fetchImpl: impl }).listModels()).toEqual(['gemini-3.8-flash', 'gemini-embedding-001']);
+    expect(calls[0]!.url).toBe('https://generativelanguage.googleapis.com/v1beta/openai/models');
   });
 
   it('uses preset models, custom models, and the main model as fast model when only main is set', () => {

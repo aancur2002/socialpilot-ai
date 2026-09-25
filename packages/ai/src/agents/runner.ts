@@ -66,7 +66,7 @@ export async function runStructured<S extends z.ZodType>(
         mockContext: call.mockContext,
       });
       const generationId = await log({
-        provider: provider.name,
+        provider: res.provider ?? provider.name,
         model: res.model,
         agent: call.agent,
         promptVersion: call.promptVersion,

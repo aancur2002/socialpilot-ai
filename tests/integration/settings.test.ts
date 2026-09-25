@@ -114,7 +114,7 @@ describe('account, knowledge editing and AI model settings', () => {
 
     it('supports Google Gemini and NVIDIA, reusing one key for text and embeddings', async () => {
       const g = await core.updateAiSettings(owner.ctx, { provider: 'google', model: null, fastModel: null, apiKey: 'AIza-test-key-5678', embeddingProvider: 'google', embeddingModel: null });
-      expect(g.effective).toMatchObject({ provider: 'google', model: 'gemini-2.5-flash', fastModel: 'gemini-2.5-flash-lite', embeddingProvider: 'google', embeddingModel: 'gemini-embedding-001', apiKeySource: 'organization' });
+      expect(g.effective).toMatchObject({ provider: 'google', model: 'gemini-3.8-flash', fastModel: 'gemini-3.1-flash-lite', embeddingProvider: 'google', embeddingModel: 'gemini-embedding-001', apiKeySource: 'organization' });
       expect(g.suggestions.google.length).toBeGreaterThan(0);
       const n = await core.updateAiSettings(owner.ctx, { provider: 'nvidia', apiKey: 'nvapi-test-key-0000', model: 'deepseek-ai/deepseek-r1', embeddingProvider: 'nvidia' });
       expect(n.effective).toMatchObject({ provider: 'nvidia', model: 'deepseek-ai/deepseek-r1', embeddingModel: 'nvidia/nv-embedqa-e5-v5' });
@@ -124,6 +124,44 @@ describe('account, knowledge editing and AI model settings', () => {
       // Different embedding service without its own key is rejected.
       await expect(core.updateAiSettings(owner.ctx, { embeddingProvider: 'openai' })).rejects.toMatchObject({ status: 400 });
       await core.updateAiSettings(owner.ctx, { provider: null, model: null, fastModel: null, apiKey: null, embeddingProvider: null, embeddingModel: null });
+    });
+
+    it('saves backup providers with their own encrypted keys and builds a failover chain', async () => {
+      const res = await core.updateAiSettings(owner.ctx, {
+        provider: 'google',
+        apiKey: 'AIza-primary-key-1111',
+        embeddingProvider: 'mock',
+        fallbacks: [{ provider: 'nvidia', model: 'meta/llama-3.3-70b-instruct', apiKey: 'nvapi-backup-key-2222' }],
+      });
+      expect(res.saved.fallbacks).toEqual([{ provider: 'nvidia', model: 'meta/llama-3.3-70b-instruct', fastModel: null, apiKey: { set: true, hint: '…2222' } }]);
+      expect(res.effective.chain.map((c) => c.provider)).toEqual(['google', 'nvidia']);
+      expect(JSON.stringify(res)).not.toMatch(/nvapi-backup|AIza-primary/);
+      const row = await db.organizationAiSettings.findUniqueOrThrow({ where: { organizationId: owner.organizationId } });
+      expect(JSON.stringify(row.fallbacks)).not.toContain('nvapi-backup');
+      core.clearAiCache(owner.organizationId);
+      const { ai } = await core.aiFor(owner.organizationId);
+      expect(ai.constructor.name).toBe('FailoverAIProvider');
+
+      // Omitting a backup's key keeps the saved one; reordering keeps it too.
+      const kept = await core.updateAiSettings(owner.ctx, { fallbacks: [{ provider: 'nvidia', model: 'deepseek-ai/deepseek-r1' }] });
+      expect(kept.saved.fallbacks[0]).toMatchObject({ model: 'deepseek-ai/deepseek-r1', apiKey: { set: true, hint: '…2222' } });
+
+      // One key serves embeddings when the embedding service matches a backup.
+      const emb = await core.updateAiSettings(owner.ctx, { embeddingProvider: 'nvidia' });
+      expect(emb.effective.embeddingProvider).toBe('nvidia');
+    });
+
+    it('rejects duplicate providers and backups without a key', async () => {
+      await expect(core.updateAiSettings(owner.ctx, { fallbacks: [{ provider: 'google' }] })).rejects.toMatchObject({ status: 400 });
+      await expect(core.updateAiSettings(owner.ctx, { fallbacks: [{ provider: 'openai' }] })).rejects.toMatchObject({ status: 400, message: expect.stringMatching(/openai backup/) });
+    });
+
+    it('tests each provider in the chain independently', async () => {
+      const res = await core.testAiSettings(owner.ctx, { provider: 'mock', embeddingProvider: 'mock', fallbacks: [{ provider: 'openai', apiKey: null }] });
+      expect(res.chain).toHaveLength(2);
+      expect(res.chain[0]).toMatchObject({ provider: 'mock', role: 'primary', ok: true });
+      expect(res.chain[1]).toMatchObject({ provider: 'openai', role: 'backup', ok: false, error: expect.stringMatching(/API key/) });
+      await core.updateAiSettings(owner.ctx, { provider: null, apiKey: null, embeddingProvider: null, fallbacks: [] });
     });
 
     it('is restricted to members who can manage settings', async () => {

@@ -1,7 +1,7 @@
-import { createAIProvider, createEmbeddingProvider, type AIProvider, type EmbeddingProvider } from '@socialpilot/ai';
+import { createAIProvider, createEmbeddingProvider, FailoverAIProvider, type AIProvider, type EmbeddingProvider } from '@socialpilot/ai';
 import { decryptSecret, encryptSecret } from '@socialpilot/auth';
 import { isProduction } from '@socialpilot/config';
-import type { OrganizationAiSettings } from '@socialpilot/database';
+import type { OrganizationAiSettings, Prisma } from '@socialpilot/database';
 import type { AiSettingsInput } from '@socialpilot/validation';
 import { requirePermission, type AuthContext } from '../context';
 import { badRequest } from '../errors';
@@ -13,11 +13,11 @@ export const MODEL_SUGGESTIONS = {
   anthropic: ['claude-opus-5', 'claude-sonnet-5', 'claude-haiku-4-5', 'claude-fable-5-1'],
   openai: ['gpt-4.1', 'gpt-4.1-mini'],
   // Providers rename models often: these are starting points, any model ID can be typed.
-  google: ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.5-pro'],
+  google: ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite', 'gemini-3.1-pro-preview'],
   nvidia: ['meta/llama-3.3-70b-instruct', 'meta/llama-3.1-8b-instruct', 'nvidia/llama-3.3-nemotron-super-49b-v1', 'deepseek-ai/deepseek-r1', 'qwen/qwen2.5-coder-32b-instruct'],
   embeddings: {
     openai: ['text-embedding-3-small'],
-    google: ['gemini-embedding-001'],
+    google: ['gemini-embedding-001', 'gemini-embedding-2-preview'],
     nvidia: ['nvidia/nv-embedqa-e5-v5', 'nvidia/llama-3.2-nv-embedqa-1b-v2'],
   },
 } as const;
@@ -34,6 +34,25 @@ interface Resolved {
   embeddingProvider: EmbeddingProviderKey;
   embeddingModel?: string;
   embeddingApiKey?: string;
+  /** Backup text providers, tried in order after the primary */
+  fallbacks: ResolvedFallback[];
+}
+
+interface ResolvedFallback {
+  provider: Provider;
+  model?: string;
+  fastModel?: string;
+  apiKey?: string;
+  /** true when the key was saved in the dashboard (vs. the server .env) */
+  orgKey: boolean;
+}
+
+/** Stored shape of one backup provider (keys encrypted). */
+interface StoredFallback {
+  provider: Provider;
+  model?: string | null;
+  fastModel?: string | null;
+  apiKeyEnc?: string | null;
 }
 
 const aad = (organizationId: string, field: string) => `ai-settings:${organizationId}:${field}`;
@@ -53,8 +72,13 @@ function resolve(organizationId: string, row: Partial<OrganizationAiSettings> | 
   const storedEmbKey = decrypt(organizationId, 'embeddingApiKey', row?.embeddingApiKeyEnc ?? null);
   const orgEmbKey = override?.embeddingApiKey !== undefined ? (override.embeddingApiKey ?? undefined) : storedEmbKey;
   // One key can serve both text and embeddings when they use the same service.
+  const fallbacks = resolveFallbacks(organizationId, row, override);
   const embeddingApiKey =
-    orgEmbKey ?? (embeddingProvider === env.EMBEDDING_PROVIDER ? env.EMBEDDING_API_KEY : undefined) ?? (provider === embeddingProvider ? orgKey : undefined) ?? (env.AI_PROVIDER === embeddingProvider ? env.AI_API_KEY : undefined);
+    orgEmbKey ??
+    (embeddingProvider === env.EMBEDDING_PROVIDER ? env.EMBEDDING_API_KEY : undefined) ??
+    (provider === embeddingProvider ? orgKey : undefined) ??
+    fallbacks.find((f) => f.provider === embeddingProvider && f.orgKey)?.apiKey ??
+    (env.AI_PROVIDER === embeddingProvider ? env.AI_API_KEY : undefined);
 
   // Models only fall back to env defaults when the provider is the server's provider.
   const sameProvider = provider === env.AI_PROVIDER;
@@ -68,16 +92,60 @@ function resolve(organizationId: string, row: Partial<OrganizationAiSettings> | 
     embeddingProvider,
     embeddingModel: pick(override?.embeddingModel, row?.embeddingModel, embeddingProvider === env.EMBEDDING_PROVIDER ? env.EMBEDDING_MODEL : undefined),
     embeddingApiKey,
+    fallbacks,
   };
 }
 
+function storedFallbacks(row: Partial<OrganizationAiSettings> | null): StoredFallback[] {
+  return Array.isArray(row?.fallbacks) ? (row.fallbacks as unknown as StoredFallback[]) : [];
+}
+
+const fallbackField = (provider: string) => `fallback:${provider}:apiKey`;
+
+/** Backup providers: from the pending input when given (keys kept per provider), else from storage. */
+function resolveFallbacks(organizationId: string, row: Partial<OrganizationAiSettings> | null, override?: AiSettingsInput): ResolvedFallback[] {
+  const { env } = getInfra();
+  const stored = storedFallbacks(row);
+  const storedKey = (provider: string) => decrypt(organizationId, fallbackField(provider), stored.find((s) => s.provider === provider)?.apiKeyEnc ?? null);
+  const source =
+    override?.fallbacks !== undefined
+      ? override.fallbacks.map((f) => ({ provider: f.provider as Provider, model: f.model ?? undefined, fastModel: f.fastModel ?? undefined, key: f.apiKey === undefined ? storedKey(f.provider) : (f.apiKey ?? undefined) }))
+      : stored.map((f) => ({ provider: f.provider, model: f.model ?? undefined, fastModel: f.fastModel ?? undefined, key: decrypt(organizationId, fallbackField(f.provider), f.apiKeyEnc ?? null) }));
+  return source.map((f) => ({
+    provider: f.provider,
+    model: f.model,
+    fastModel: f.fastModel,
+    apiKey: f.key ?? (env.AI_PROVIDER === f.provider ? env.AI_API_KEY : undefined),
+    orgKey: Boolean(f.key),
+  }));
+}
+
 function assertUsable(r: Resolved) {
-  if (isProduction(getInfra().env) && (r.provider === 'mock' || r.embeddingProvider === 'mock')) throw badRequest('The mock AI provider is not allowed in production');
+  const providers = [r.provider, ...r.fallbacks.map((f) => f.provider)];
+  if (new Set(providers).size !== providers.length) throw badRequest('Each provider can appear only once (primary or backup)');
+  if (isProduction(getInfra().env) && (providers.includes('mock') || r.embeddingProvider === 'mock')) throw badRequest('The mock AI provider is not allowed in production');
+  for (const f of r.fallbacks) {
+    if (f.provider !== 'mock' && !f.apiKey) throw badRequest(`Add an API key for the ${f.provider} backup`);
+  }
   if (r.provider !== 'mock' && !r.apiKey) throw badRequest(`Add an API key for ${r.provider}`);
   if (r.embeddingProvider !== 'mock' && !r.embeddingApiKey) throw badRequest(`Add an API key for ${r.embeddingProvider} embeddings`);
 }
 
+/** One provider per entry in the chain (primary first), for per-provider testing. */
+function buildChain(r: Resolved): AIProvider[] {
+  const primary = createAIProvider({ provider: r.provider, apiKey: r.apiKey, model: r.model, fastModel: r.fastModel, openaiBaseUrl: r.baseUrl, embeddingProvider: 'mock' });
+  const backups = r.fallbacks.map((f) =>
+    createAIProvider({ provider: f.provider, apiKey: f.apiKey, model: f.model, fastModel: f.fastModel, openaiBaseUrl: f.provider === 'openai' ? r.baseUrl : undefined, embeddingProvider: 'mock' }),
+  );
+  return [primary, ...backups];
+}
+
 function build(r: Resolved): { ai: AIProvider; embeddings: EmbeddingProvider } {
+  const chain = buildChain(r);
+  const ai =
+    chain.length > 1
+      ? new FailoverAIProvider(chain, (e) => getInfra().logger.warn({ from: e.from, to: e.to, reason: e.reason }, e.to ? 'AI provider failed; trying backup' : 'AI provider failed; no backups left'))
+      : chain[0]!;
   const config = {
     provider: r.provider,
     apiKey: r.apiKey,
@@ -88,7 +156,7 @@ function build(r: Resolved): { ai: AIProvider; embeddings: EmbeddingProvider } {
     embeddingApiKey: r.embeddingApiKey,
     embeddingModel: r.embeddingModel,
   };
-  return { ai: createAIProvider(config), embeddings: createEmbeddingProvider(config) };
+  return { ai, embeddings: createEmbeddingProvider(config) };
 }
 
 const cache = new Map<string, { expires: number; value: { ai: AIProvider; embeddings: EmbeddingProvider } }>();
@@ -133,6 +201,7 @@ export async function getAiSettings(ctx: AuthContext) {
   const effective = resolve(ctx.organizationId, row);
   const storedKey = decrypt(ctx.organizationId, 'apiKey', row?.apiKeyEnc ?? null);
   const storedEmbKey = decrypt(ctx.organizationId, 'embeddingApiKey', row?.embeddingApiKeyEnc ?? null);
+  const chain = buildChain(effective);
   const probe = build(effective);
   return {
     saved: {
@@ -144,6 +213,10 @@ export async function getAiSettings(ctx: AuthContext) {
       embeddingModel: row?.embeddingModel ?? null,
       apiKey: storedKey ? { set: true, hint: hint(storedKey) } : { set: false, hint: null },
       embeddingApiKey: storedEmbKey ? { set: true, hint: hint(storedEmbKey) } : { set: false, hint: null },
+      fallbacks: storedFallbacks(row).map((f) => {
+        const key = decrypt(ctx.organizationId, fallbackField(f.provider), f.apiKeyEnc ?? null);
+        return { provider: f.provider, model: f.model ?? null, fastModel: f.fastModel ?? null, apiKey: key ? { set: true, hint: hint(key) } : { set: false, hint: null } };
+      }),
     },
     effective: {
       provider: effective.provider,
@@ -152,6 +225,8 @@ export async function getAiSettings(ctx: AuthContext) {
       embeddingProvider: effective.embeddingProvider,
       embeddingModel: probe.embeddings.model,
       apiKeySource: storedKey ? 'organization' : effective.apiKey ? 'server' : 'none',
+      /** Order in which providers are tried */
+      chain: chain.map((p) => ({ provider: p.name, model: p.modelFor('default'), fastModel: p.modelFor('fast') })),
     },
     serverDefaults: { provider: env.AI_PROVIDER, model: env.AI_MODEL ?? null, fastModel: env.AI_FAST_MODEL ?? null, embeddingProvider: env.EMBEDDING_PROVIDER },
     mockAllowed: !isProduction(env),
@@ -168,7 +243,7 @@ export async function updateAiSettings(ctx: AuthContext, input: AiSettingsInput)
   const next = resolve(ctx.organizationId, row, input);
   assertUsable(next);
 
-  const data: Partial<OrganizationAiSettings> = {};
+  const data: Prisma.OrganizationAiSettingsUncheckedUpdateInput = {};
   if (input.provider !== undefined) data.provider = input.provider;
   if (input.model !== undefined) data.model = input.model;
   if (input.fastModel !== undefined) data.fastModel = input.fastModel;
@@ -177,52 +252,145 @@ export async function updateAiSettings(ctx: AuthContext, input: AiSettingsInput)
   if (input.embeddingModel !== undefined) data.embeddingModel = input.embeddingModel;
   if (input.apiKey !== undefined) data.apiKeyEnc = input.apiKey ? encrypt(ctx.organizationId, 'apiKey', input.apiKey) : null;
   if (input.embeddingApiKey !== undefined) data.embeddingApiKeyEnc = input.embeddingApiKey ? encrypt(ctx.organizationId, 'embeddingApiKey', input.embeddingApiKey) : null;
+  if (input.fallbacks !== undefined) {
+    const stored = storedFallbacks(row);
+    data.fallbacks = input.fallbacks.map((f): StoredFallback => {
+      const existing = stored.find((s) => s.provider === f.provider)?.apiKeyEnc ?? null;
+      return {
+        provider: f.provider as Provider,
+        model: f.model ?? null,
+        fastModel: f.fastModel ?? null,
+        apiKeyEnc: f.apiKey === undefined ? existing : f.apiKey ? encrypt(ctx.organizationId, fallbackField(f.provider), f.apiKey) : null,
+      };
+    }) as unknown as Prisma.InputJsonValue;
+  }
 
   await db.organizationAiSettings.upsert({
     where: { organizationId: ctx.organizationId },
-    create: { organizationId: ctx.organizationId, ...data, updatedById: ctx.userId },
+    create: { ...(data as Prisma.OrganizationAiSettingsUncheckedCreateInput), organizationId: ctx.organizationId, updatedById: ctx.userId },
     update: { ...data, updatedById: ctx.userId },
   });
   clearAiCache(ctx.organizationId);
+  const summary = (r: Resolved) => ({ provider: r.provider, model: r.model, fastModel: r.fastModel, embeddingProvider: r.embeddingProvider, embeddingModel: r.embeddingModel, backups: r.fallbacks.map((f) => `${f.provider}${f.model ? `:${f.model}` : ''}`) });
   await audit(ctx, {
     action: 'ai.settings_changed',
     resourceType: 'OrganizationAiSettings',
-    before: { provider: before.provider, model: before.model, fastModel: before.fastModel, embeddingProvider: before.embeddingProvider, embeddingModel: before.embeddingModel },
-    after: { provider: next.provider, model: next.model, fastModel: next.fastModel, embeddingProvider: next.embeddingProvider, embeddingModel: next.embeddingModel, apiKeyChanged: input.apiKey !== undefined, embeddingApiKeyChanged: input.embeddingApiKey !== undefined },
+    before: summary(before),
+    after: { ...summary(next), apiKeyChanged: input.apiKey !== undefined, embeddingApiKeyChanged: input.embeddingApiKey !== undefined, backupKeysChanged: (input.fallbacks ?? []).filter((f) => f.apiKey !== undefined).map((f) => f.provider) },
   });
   const embeddingChanged = build(before).embeddings.model !== build(next).embeddings.model;
   return { ...(await getAiSettings(ctx)), reindexRequired: embeddingChanged };
 }
 
-/** Makes a tiny real call with the given (unsaved) settings merged over the saved ones. */
+const NON_TEXT_MODEL = /embed|tts|imagen|veo|image-generation|rerank|guard|aqa|audio|parse|clip|vila/i;
+
+/** Which key to use for a provider when listing models: typed > saved (primary, backup, embeddings) > .env. */
+function keyForProvider(organizationId: string, row: Partial<OrganizationAiSettings> | null, provider: string, typed?: string): string | undefined {
+  const { env } = getInfra();
+  if (typed) return typed;
+  if (row?.provider === provider) {
+    const k = decrypt(organizationId, 'apiKey', row.apiKeyEnc ?? null);
+    if (k) return k;
+  }
+  const backup = storedFallbacks(row).find((f) => f.provider === provider);
+  const backupKey = backup ? decrypt(organizationId, fallbackField(provider), backup.apiKeyEnc ?? null) : undefined;
+  if (backupKey) return backupKey;
+  if (row?.embeddingProvider === provider) {
+    const k = decrypt(organizationId, 'embeddingApiKey', row.embeddingApiKeyEnc ?? null);
+    if (k) return k;
+  }
+  if (env.AI_PROVIDER === provider && env.AI_API_KEY) return env.AI_API_KEY;
+  if (env.EMBEDDING_PROVIDER === provider) return env.EMBEDDING_API_KEY ?? undefined;
+  return undefined;
+}
+
+/** Lists the models a provider offers to this key, filtered to text or embedding models. */
+export async function listAvailableModels(ctx: AuthContext, input: { provider: string; apiKey?: string; purpose: 'text' | 'embedding' }) {
+  requirePermission(ctx, 'settings:manage');
+  if (input.provider === 'mock') return { models: input.purpose === 'embedding' ? ['hashing-1536-v1'] : ['mock-v1', 'mock-fast-v1'] };
+  const row = await getInfra().db.organizationAiSettings.findUnique({ where: { organizationId: ctx.organizationId } });
+  const apiKey = keyForProvider(ctx.organizationId, row, input.provider, input.apiKey);
+  if (!apiKey) throw badRequest(`Enter the ${input.provider} API key first`);
+  const provider = createAIProvider({ provider: input.provider as Provider, apiKey, embeddingProvider: 'mock', openaiBaseUrl: input.provider === 'openai' ? (row?.baseUrl ?? getInfra().env.OPENAI_BASE_URL) : undefined });
+  if (!provider.listModels) throw badRequest(`${input.provider} doesn’t offer a model list`);
+  try {
+    const all = await provider.listModels();
+    const models = input.purpose === 'embedding' ? all.filter((m) => /embed/i.test(m)) : all.filter((m) => !NON_TEXT_MODEL.test(m));
+    return { models };
+  } catch (error) {
+    throw badRequest(`Could not load models: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+/** After a "model not found" error, name a few models the key can use. */
+async function modelHint(provider: AIProvider): Promise<string> {
+  try {
+    const models = (await provider.listModels?.())?.filter((m) => !NON_TEXT_MODEL.test(m)) ?? [];
+    return models.length ? ` Models available to your key include: ${models.slice(0, 8).join(', ')}.` : '';
+  } catch {
+    return '';
+  }
+}
+
+type ChainTestResult = { provider: string; role: 'primary' | 'backup'; ok: boolean; model?: string; latencyMs?: number; error?: string };
+
+/**
+ * Makes a tiny real call to every provider in the chain (primary and each backup,
+ * independently) plus the embeddings provider, using unsaved values merged over saved ones.
+ */
 export async function testAiSettings(ctx: AuthContext, input: AiSettingsInput) {
   requirePermission(ctx, 'settings:manage');
   const row = await getInfra().db.organizationAiSettings.findUnique({ where: { organizationId: ctx.organizationId } });
   const resolved = resolve(ctx.organizationId, row, input);
-  const result: { text: { ok: boolean; model?: string; latencyMs?: number; error?: string }; embeddings: { ok: boolean; model?: string; dimensions?: number; latencyMs?: number; error?: string } } = {
-    text: { ok: false },
-    embeddings: { ok: false },
-  };
-  try {
-    assertUsable(resolved);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return { text: { ok: false, error: message }, embeddings: { ok: false, error: message } };
+  const providers = [resolved.provider, ...resolved.fallbacks.map((f) => f.provider)];
+  if (new Set(providers).size !== providers.length) {
+    const error = 'Each provider can appear only once (primary or backup)';
+    return { text: { ok: false, error }, chain: [] as ChainTestResult[], embeddings: { ok: false, error } };
   }
-  const { ai, embeddings } = build(resolved);
-  let started = Date.now();
-  try {
-    const res = await ai.generateText({ system: 'You are a connection test. Reply with the single word OK.', messages: [{ role: 'user', content: 'Connection test' }], maxTokens: 256, effort: 'low' });
-    result.text = { ok: true, model: res.model, latencyMs: Date.now() - started };
-  } catch (error) {
-    result.text = { ok: false, model: ai.modelFor('default'), error: error instanceof Error ? error.message : String(error) };
+
+  const entries: { provider: string; role: 'primary' | 'backup'; build: () => AIProvider; missingKey: boolean }[] = [
+    { provider: resolved.provider, role: 'primary', missingKey: resolved.provider !== 'mock' && !resolved.apiKey, build: () => buildChain({ ...resolved, fallbacks: [] })[0]! },
+    ...resolved.fallbacks.map((f) => ({
+      provider: f.provider,
+      role: 'backup' as const,
+      missingKey: f.provider !== 'mock' && !f.apiKey,
+      build: () => createAIProvider({ provider: f.provider, apiKey: f.apiKey, model: f.model, fastModel: f.fastModel, openaiBaseUrl: f.provider === 'openai' ? resolved.baseUrl : undefined, embeddingProvider: 'mock' }),
+    })),
+  ];
+  const chain: ChainTestResult[] = [];
+  for (const entry of entries) {
+    if (entry.missingKey) {
+      chain.push({ provider: entry.provider, role: entry.role, ok: false, error: `Add an API key for ${entry.provider}` });
+      continue;
+    }
+    const started = Date.now();
+    let provider: AIProvider | undefined;
+    try {
+      provider = entry.build();
+      const res = await provider.generateText({ system: 'You are a connection test. Reply with the single word OK.', messages: [{ role: 'user', content: 'Connection test' }], maxTokens: 256, effort: 'low' });
+      chain.push({ provider: entry.provider, role: entry.role, ok: true, model: res.model, latencyMs: Date.now() - started });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const notFound = /HTTP 404|not found|does not exist|unknown model/i.test(message);
+      chain.push({ provider: entry.provider, role: entry.role, ok: false, model: provider?.modelFor('default'), error: notFound && provider ? `${message}.${await modelHint(provider)}`.replace('..', '.') : message });
+    }
   }
-  started = Date.now();
-  try {
-    const [vector] = await embeddings.generateEmbeddings(['connection test']);
-    result.embeddings = { ok: Boolean(vector?.length), model: embeddings.model, dimensions: vector?.length, latencyMs: Date.now() - started };
-  } catch (error) {
-    result.embeddings = { ok: false, model: embeddings.model, error: error instanceof Error ? error.message : String(error) };
+
+  let embeddings: { ok: boolean; model?: string; dimensions?: number; latencyMs?: number; error?: string };
+  if (resolved.embeddingProvider !== 'mock' && !resolved.embeddingApiKey) {
+    embeddings = { ok: false, error: `Add an API key for ${resolved.embeddingProvider} embeddings` };
+  } else {
+    const started = Date.now();
+    let model: string | undefined;
+    try {
+      const emb = build({ ...resolved, fallbacks: [] }).embeddings;
+      model = emb.model;
+      const [vector] = await emb.generateEmbeddings(['connection test'], 'query');
+      embeddings = { ok: Boolean(vector?.length), model, dimensions: vector?.length, latencyMs: Date.now() - started };
+    } catch (error) {
+      embeddings = { ok: false, model, error: error instanceof Error ? error.message : String(error) };
+    }
   }
-  return result;
+  const primary = chain[0]!;
+  return { text: { ok: primary.ok, model: primary.model, latencyMs: primary.latencyMs, error: primary.error }, chain, embeddings };
 }

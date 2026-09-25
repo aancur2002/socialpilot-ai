@@ -81,6 +81,12 @@ export class AnthropicProvider implements AIProvider {
     return this.call(input);
   }
 
+  async listModels(): Promise<string[]> {
+    const ids: string[] = [];
+    for await (const model of this.client.models.list()) ids.push(model.id);
+    return ids.sort();
+  }
+
   async generateStructured<S extends z.ZodType>(input: GenerateStructuredInput<S>): Promise<GenerateStructuredResult<z.infer<S>>> {
     const result = await this.call(input, toStrictJsonSchema(input.schema));
     let parsed: unknown;

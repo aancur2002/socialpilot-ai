@@ -448,6 +448,9 @@ model OrganizationAiSettings {
   embeddingProvider   String?
   embeddingModel      String?
   embeddingApiKeyEnc  String?
+  /// Backup text providers tried in order when the primary fails:
+  /// [{ "provider": "nvidia", "model": "...", "fastModel": "...", "apiKeyEnc": "v1:..." }]
+  fallbacks           Json     @default("[]")
   updatedById         String?
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
