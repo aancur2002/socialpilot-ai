@@ -1,7 +1,8 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowDown, ArrowUp, CheckCircle2, ListRestart, Plus, PlugZap, Trash2, XCircle } from 'lucide-react';
+import { ArrowDown, ArrowUp, CheckCircle2, Plus, PlugZap, Trash2, XCircle } from 'lucide-react';
+import { ModelPicker } from './model-picker';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { api, errorMessage } from '@/lib/api';
@@ -88,21 +89,13 @@ export function AiModelSettings() {
     mutationFn: (v: { provider: string; apiKey?: string; purpose: 'text' | 'embedding' }) => api<{ models: string[] }>('/ai-settings/models', { body: { provider: v.provider, purpose: v.purpose, ...(v.apiKey?.trim() ? { apiKey: v.apiKey.trim() } : {}) } }),
     onSuccess: (r, v) => {
       setLiveModels((m) => ({ ...m, [`${v.purpose}:${v.provider}`]: r.models }));
-      toast.success(r.models.length ? `Loaded ${r.models.length} models from ${PROVIDER_NAMES[v.provider] ?? v.provider}. Pick one from the list.` : 'The provider returned no models for this key');
+      toast.success(r.models.length ? `Loaded ${r.models.length} models from ${PROVIDER_NAMES[v.provider] ?? v.provider}` : 'The provider returned no models for this key');
     },
     onError: (e) => toast.error(errorMessage(e)),
   });
   const modelsFor = (purpose: 'text' | 'embedding', p: string, fallback: string[]) => liveModels[`${purpose}:${p}`] ?? fallback;
-  const LoadModels = ({ purpose, p, apiKey }: { purpose: 'text' | 'embedding'; p: string; apiKey?: string }) => (
-    <button
-      type="button"
-      className="inline-flex items-center gap-1 text-xs font-medium text-clearance hover:underline disabled:opacity-50"
-      disabled={loadModels.isPending}
-      onClick={() => loadModels.mutate({ provider: p, apiKey, purpose })}
-    >
-      <ListRestart className="h-3.5 w-3.5" /> {liveModels[`${purpose}:${p}`] ? 'Reload models' : 'Load models from provider'}
-    </button>
-  );
+  const live = (purpose: 'text' | 'embedding', p: string) => liveModels[`${purpose}:${p}`];
+  const isLoading = (purpose: 'text' | 'embedding', p: string) => loadModels.isPending && loadModels.variables?.provider === p && loadModels.variables?.purpose === purpose;
   const [test, setTest] = useState<TestResult | null>(null);
   const [reindex, setReindex] = useState(false);
 
@@ -223,13 +216,11 @@ export function AiModelSettings() {
             {provider !== 'mock' && (
               <>
                 <Field label="Main model" htmlFor="ai-model" hint="Pick from the list or type any model ID your provider offers. Blank uses the provider default.">
-                  <Input id="ai-model" list="ai-model-options" value={f.model} placeholder={suggestions[0] ?? 'model-id'} onChange={(e) => setF({ ...f, model: e.target.value })} />
-                  <LoadModels purpose="text" p={provider} apiKey={f.apiKey} />
+                  <ModelPicker id="ai-model" value={f.model} placeholder={suggestions[0] ?? 'model-id'} onChange={(v) => setF({ ...f, model: v })} models={live('text', provider)} loading={isLoading('text', provider)} onLoad={() => loadModels.mutate({ provider, apiKey: f.apiKey, purpose: 'text' })} />
                 </Field>
                 <Field label="Fast model" htmlFor="ai-fast" hint="Used for quick tasks like intent detection. A smaller model lowers cost. Blank uses the main model.">
-                  <Input id="ai-fast" list="ai-model-options" value={f.fastModel} onChange={(e) => setF({ ...f, fastModel: e.target.value })} />
+                  <ModelPicker id="ai-fast" value={f.fastModel} placeholder={suggestions[1] ?? ''} onChange={(v) => setF({ ...f, fastModel: v })} models={live('text', provider)} loading={isLoading('text', provider)} onLoad={() => loadModels.mutate({ provider, apiKey: f.apiKey, purpose: 'text' })} />
                 </Field>
-                <datalist id="ai-model-options">{suggestions.map((m) => <option key={m} value={m} />)}</datalist>
                 <KeyField id="ai-key" label="API key" status={d.saved.apiKey} value={f.apiKey} onChange={(v) => setF({ ...f, apiKey: v })} remove={f.removeKey} onRemove={(v) => setF({ ...f, removeKey: v })} />
                 {provider === 'openai' && (
                   <Field label="Base URL" htmlFor="ai-base" hint="Only for OpenAI-compatible gateways. Blank uses api.openai.com.">
@@ -256,9 +247,7 @@ export function AiModelSettings() {
             {embeddingProvider !== 'mock' && (
               <>
                 <Field label="Embedding model" htmlFor="emb-model" hint="Vectors up to 1536 dimensions are stored as-is (smaller ones are padded without changing results). Blank uses the provider default.">
-                  <Input id="emb-model" list="emb-model-options" value={f.embeddingModel} placeholder={d.suggestions.embeddings[embeddingProvider as 'openai']?.[0] ?? ''} onChange={(e) => setF({ ...f, embeddingModel: e.target.value })} />
-                  <datalist id="emb-model-options">{modelsFor('embedding', embeddingProvider, d.suggestions.embeddings[embeddingProvider as 'openai'] ?? []).map((m) => <option key={m} value={m} />)}</datalist>
-                  <LoadModels purpose="embedding" p={embeddingProvider} apiKey={f.embeddingApiKey} />
+                  <ModelPicker id="emb-model" purpose="embedding" value={f.embeddingModel} placeholder={d.suggestions.embeddings[embeddingProvider as 'openai']?.[0] ?? ''} onChange={(v) => setF({ ...f, embeddingModel: v })} models={live('embedding', embeddingProvider)} loading={isLoading('embedding', embeddingProvider)} onLoad={() => loadModels.mutate({ provider: embeddingProvider, apiKey: f.embeddingApiKey, purpose: 'embedding' })} />
                 </Field>
                 <KeyField id="emb-key" label="Embeddings API key" status={d.saved.embeddingApiKey} value={f.embeddingApiKey} onChange={(v) => setF({ ...f, embeddingApiKey: v })} remove={f.removeEmbeddingKey} onRemove={(v) => setF({ ...f, removeEmbeddingKey: v })} />
                 {embeddingProvider === provider && <p className="text-xs text-ink-3">Leave the key blank to reuse the text generation key.</p>}
@@ -298,9 +287,7 @@ export function AiModelSettings() {
                   {b.provider !== 'mock' ? (
                     <>
                       <Field label="Model" htmlFor={`bk-m-${i}`} hint="Blank uses the provider default.">
-                        <Input id={`bk-m-${i}`} list={`bk-models-${i}`} value={b.model} placeholder={models[0] ?? ''} onChange={(e) => updateBackup(i, { model: e.target.value })} />
-                        <datalist id={`bk-models-${i}`}>{models.map((m) => <option key={m} value={m} />)}</datalist>
-                        <LoadModels purpose="text" p={b.provider} apiKey={b.apiKey} />
+                        <ModelPicker id={`bk-m-${i}`} value={b.model} placeholder={models[0] ?? ''} onChange={(v) => updateBackup(i, { model: v })} models={live('text', b.provider)} loading={isLoading('text', b.provider)} onLoad={() => loadModels.mutate({ provider: b.provider, apiKey: b.apiKey, purpose: 'text' })} />
                       </Field>
                       <KeyField id={`bk-k-${i}`} label="API key" status={b.saved} value={b.apiKey} onChange={(v) => updateBackup(i, { apiKey: v })} remove={b.removeKey} onRemove={(v) => updateBackup(i, { removeKey: v })} />
                     </>
