@@ -1,0 +1,140 @@
+@import 'tailwindcss';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+  SocialPilot "flight deck" tokens.
+  ink: navy text/rail · paper: cool grey-green ground · clearance: primary actions
+  runway: needs attention · alert: failures · line: hairlines
+*/
+:root {
+  --paper: #f6f7f3;
+  --surface: #ffffff;
+  --surface-2: #eef0ea;
+  --ink: #14213d;
+  --ink-2: #4a5570;
+  --ink-3: #7a8398;
+  --line: #dadfd5;
+  --clearance: #0e7c70;
+  --clearance-ink: #ffffff;
+  --clearance-soft: #dcefeb;
+  --runway: #d9962b;
+  --runway-soft: #f8ecd6;
+  --alert: #c23b22;
+  --alert-soft: #f7e1dc;
+  --sky: #3867b8;
+  --sky-soft: #e1e9f6;
+  --rail: #14213d;
+  --rail-ink: #c9d1e3;
+  --rail-active: #22335a;
+  --focus: #3867b8;
+  /* Chart categorical slots (validated for CVD separation on each surface) */
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+}
+
+.dark {
+  --paper: #0d1524;
+  --surface: #15203a;
+  --surface-2: #1b2846;
+  --ink: #e6eaf0;
+  --ink-2: #aab3c7;
+  --ink-3: #7c879f;
+  --line: #26345a;
+  --clearance: #2fb3a3;
+  --clearance-ink: #06201d;
+  --clearance-soft: #103a38;
+  --runway: #e8ae4f;
+  --runway-soft: #3a2d15;
+  --alert: #ef6b52;
+  --alert-soft: #3d1c17;
+  --sky: #7ea4ea;
+  --sky-soft: #1c2d52;
+  --rail: #0a1120;
+  --rail-ink: #a9b4cb;
+  --rail-active: #1b2846;
+  --focus: #7ea4ea;
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-line: var(--line);
+  --color-clearance: var(--clearance);
+  --color-clearance-ink: var(--clearance-ink);
+  --color-clearance-soft: var(--clearance-soft);
+  --color-runway: var(--runway);
+  --color-runway-soft: var(--runway-soft);
+  --color-alert: var(--alert);
+  --color-alert-soft: var(--alert-soft);
+  --color-sky: var(--sky);
+  --color-sky-soft: var(--sky-soft);
+  --color-rail: var(--rail);
+  --color-rail-ink: var(--rail-ink);
+  --color-rail-active: var(--rail-active);
+  --font-sans: var(--font-instrument), ui-sans-serif, system-ui, sans-serif;
+  --radius-panel: 10px;
+  --radius-control: 6px;
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+  }
+  html.dark {
+    color-scheme: dark;
+  }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  :focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.012em;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* The flight strip: a status-coded list row. The left edge carries the state. */
+.strip {
+  position: relative;
+  border-left: 4px solid var(--strip, var(--line));
+}
+.strip-clearance {
+  --strip: var(--clearance);
+}
+.strip-runway {
+  --strip: var(--runway);
+}
+.strip-alert {
+  --strip: var(--alert);
+}
+.strip-sky {
+  --strip: var(--sky);
+}
+.strip-idle {
+  --strip: var(--ink-3);
+}

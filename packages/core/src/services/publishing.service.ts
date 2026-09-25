@@ -67,6 +67,8 @@ export async function executePublish(scheduledPostId: string, attempt: number): 
   if (!existing) return { status: 'skipped', reason: 'Scheduled post no longer exists' };
   if (existing.publishedPost || existing.status === 'PUBLISHED') return { status: 'skipped', reason: 'Already published' };
   if (existing.status === 'CANCELLED') return { status: 'skipped', reason: 'Cancelled' };
+  // A failed post is final; retrying means rescheduling, which creates a new scheduled post.
+  if (existing.status === 'FAILED') return { status: 'skipped', reason: 'Already failed' };
   if (existing.status === 'PUBLISHING') {
     if (existing.publishingAt && Date.now() - existing.publishingAt.getTime() < STALE_PUBLISHING_MS) return { status: 'skipped', reason: 'Another worker is publishing this post' };
     await markFailed(scheduledPostId, 'Publishing was interrupted and the result is unknown. Check the platform before retrying to avoid a duplicate post.', 'UNKNOWN_OUTCOME');
@@ -117,7 +119,7 @@ export async function executePublish(scheduledPostId: string, attempt: number): 
 
   // ── Atomic claim ──
   const claimed = await db.scheduledPost.updateMany({
-    where: { id: post.id, status: { in: ['SCHEDULED', 'QUEUED', 'FAILED'] } },
+    where: { id: post.id, status: { in: ['SCHEDULED', 'QUEUED'] } },
     data: { status: 'PUBLISHING', publishingAt: new Date(), attempts: { increment: 1 } },
   });
   if (!claimed.count) return { status: 'skipped', reason: 'Could not claim post (state changed)' };

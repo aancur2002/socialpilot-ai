@@ -65,6 +65,9 @@ describe('publishing engine', () => {
     const post = await scheduledPost(content.id);
     expect(await core.executePublish(post.id, 1)).toMatchObject({ status: 'failed' });
     expect((await core.getInfra().db.scheduledPost.findUniqueOrThrow({ where: { id: post.id } })).attempts).toBe(1);
+    // A stale queue delivery for the failed post must not attempt it again.
+    expect(await core.executePublish(post.id, 2)).toMatchObject({ status: 'skipped', reason: 'Already failed' });
+    expect((await core.getInfra().db.scheduledPost.findUniqueOrThrow({ where: { id: post.id } })).attempts).toBe(1);
   });
 
   it('flags the account for re-authentication on expired tokens', async () => {

@@ -1,5 +1,6 @@
 import js from '@eslint/js';
 import globals from 'globals';
+import reactHooks from 'eslint-plugin-react-hooks';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
@@ -14,6 +15,11 @@ export default tseslint.config(
       'no-control-regex': 'off',
       'no-console': ['error', { allow: ['warn', 'error'] }],
     },
+  },
+  {
+    files: ['apps/web/**/*.tsx', 'apps/web/**/*.ts'],
+    plugins: { 'react-hooks': reactHooks },
+    rules: { 'react-hooks/rules-of-hooks': 'error', 'react-hooks/exhaustive-deps': 'warn' },
   },
   {
     files: ['**/*.test.ts', 'tests/**', '**/scripts/**', '**/seed.ts'],
