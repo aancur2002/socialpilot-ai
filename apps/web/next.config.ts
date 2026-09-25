@@ -6,6 +6,8 @@ const apiUrl = process.env.API_URL ?? 'http://localhost:4000';
 // session cookie stays first-party (httpOnly, SameSite=Lax) and CSRF checks see our Origin.
 const config: NextConfig = {
   reactStrictMode: true,
+  // Hide the Next.js development badge (the "N" circle shown during `next dev`).
+  devIndicators: false,
   output: 'standalone',
   transpilePackages: ['@socialpilot/validation'],
   poweredByHeader: false,
