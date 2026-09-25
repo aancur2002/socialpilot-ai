@@ -53,11 +53,14 @@ export interface AIProvider {
   generateStructured<S extends z.ZodType>(input: GenerateStructuredInput<S>): Promise<GenerateStructuredResult<z.infer<S>>>;
 }
 
+/** Some embedding models encode questions and documents differently. */
+export type EmbeddingPurpose = 'query' | 'document';
+
 export interface EmbeddingProvider {
   readonly name: string;
   readonly model: string;
   readonly dimensions: number;
-  generateEmbeddings(texts: string[]): Promise<number[][]>;
+  generateEmbeddings(texts: string[], purpose?: EmbeddingPurpose): Promise<number[][]>;
 }
 
 export class AiProviderError extends Error {

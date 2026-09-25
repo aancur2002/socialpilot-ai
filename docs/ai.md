@@ -8,9 +8,17 @@
 |---|---|---|
 | `anthropic` | Official `@anthropic-ai/sdk`, structured outputs (`output_config.format` with a JSON schema) | Default model `claude-opus-5`. Override with `AI_MODEL` or `AI_FAST_MODEL`, for example `AI_FAST_MODEL=claude-haiku-4-5` to cut the cost of intent classification. Server-side refusal fallbacks are enabled (`fallbacks: "default"`). A refusal escalates the conversation to a person. |
 | `openai` | OpenAI-compatible chat completions with strict `json_schema` | `OPENAI_BASE_URL` points at compatible gateways |
+| `google` | Gemini through Google's OpenAI-compatible endpoint | Free tier (key from aistudio.google.com). Default `gemini-2.5-flash`, fast `gemini-2.5-flash-lite` |
+| `nvidia` | NVIDIA NIM (build.nvidia.com), OpenAI-compatible | Free credits. Default `meta/llama-3.3-70b-instruct`, fast `meta/llama-3.1-8b-instruct`; any NIM model ID works |
 | `mock` | Deterministic heuristics, fully offline | Used by the tests, the seed and development without keys. Refused in production. |
 
-Embeddings: `openai` (`text-embedding-3-small`, 1536 dimensions) or `mock`, a local feature-hashing embedder that captures word overlap only. Anthropic has no embeddings endpoint. For real semantic search in production, set `EMBEDDING_PROVIDER=openai`. Chunks record which embedding model produced them, and search only compares vectors from the same model. After switching models, re-process the knowledge sources.
+Embeddings: `openai` (`text-embedding-3-small`), `google` (`gemini-embedding-001`, requested at 1536 dimensions), `nvidia` (`nvidia/nv-embedqa-e5-v5`, 1024 dimensions, sent with `input_type` query/passage) or `mock`, a local feature-hashing embedder that captures word overlap only. Anthropic has no embeddings endpoint. For real semantic search in production, set `EMBEDDING_PROVIDER=openai`. Chunks record which embedding model produced them, and search only compares vectors from the same model. After switching models, re-process the knowledge sources.
+
+### Google and NVIDIA specifics
+
+- **Structured output is negotiated.** Their support for strict JSON schemas varies by model, so the provider tries `json_schema`, then `json_object`, then plain instructions with the schema, falling back only when the endpoint rejects a mode (HTTP 400). It remembers the mode that worked. Every result is still validated with zod, so a model that ignores the format is retried and then escalated, never used.
+- **Embeddings are fitted to the 1536-dimension column.** Shorter vectors are zero-padded, which changes neither dot products nor norms, so cosine similarity is identical. Longer vectors are truncated and re-normalized, which is valid for Matryoshka-trained models such as `gemini-embedding-001`.
+- **Free tiers are for testing.** Rate limits are low, and under Google's terms free-tier prompts may be used to improve its products. Use paid keys for customer data.
 
 ## Agents and prompts
 

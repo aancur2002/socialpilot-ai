@@ -6,6 +6,7 @@ import {
   AiOutputValidationError,
   type AIProvider,
   type EmbeddingProvider,
+  type EmbeddingPurpose,
   type GenerateStructuredInput,
   type GenerateStructuredResult,
   type GenerateTextInput,
@@ -214,7 +215,7 @@ export class HashingEmbeddingProvider implements EmbeddingProvider {
   readonly model = 'hashing-1536-v1';
   readonly dimensions = 1536;
 
-  async generateEmbeddings(texts: string[]): Promise<number[][]> {
+  async generateEmbeddings(texts: string[], _purpose?: EmbeddingPurpose): Promise<number[][]> {
     return texts.map((text) => {
       const vec = new Array<number>(this.dimensions).fill(0);
       const toks = tokens(text);

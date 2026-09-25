@@ -147,7 +147,7 @@ export async function processKnowledgeSource(sourceId: string): Promise<void> {
     const text = (await extractText(source)).trim();
     if (!text) throw new Error('No text could be extracted from this source');
     const chunks = chunkText(text);
-    const vectors = await embeddings.generateEmbeddings(chunks.map((c) => `${source.title}\n${c.content}`));
+    const vectors = await embeddings.generateEmbeddings(chunks.map((c) => `${source.title}\n${c.content}`), 'document');
     await db.$transaction(async (tx) => {
       await tx.knowledgeChunk.deleteMany({ where: { sourceId } });
       for (let i = 0; i < chunks.length; i++) {
@@ -185,7 +185,7 @@ export interface KnowledgeHit {
 export async function searchKnowledgeInternal(organizationId: string, clientId: string, query: string, limit = 5, minScore = 0): Promise<KnowledgeHit[]> {
   const { db } = getInfra();
   const { embeddings } = await aiFor(organizationId);
-  const [vector] = await embeddings.generateEmbeddings([query]);
+  const [vector] = await embeddings.generateEmbeddings([query], 'query');
   if (!vector) return [];
   const rows = await db.$queryRaw<{ id: string; sourceId: string; title: string; content: string; score: number }[]>(Prisma.sql`
     SELECT c.id, c."sourceId", s.title, c.content, 1 - (c.embedding <=> ${toVectorLiteral(vector)}::vector) AS score

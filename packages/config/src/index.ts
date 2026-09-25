@@ -62,11 +62,11 @@ export const envSchema = z
     JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
     SESSION_TTL_HOURS: z.coerce.number().int().positive().default(168),
 
-    AI_PROVIDER: z.enum(['anthropic', 'openai', 'mock']).default('mock'),
+    AI_PROVIDER: z.enum(['anthropic', 'openai', 'google', 'nvidia', 'mock']).default('mock'),
     AI_API_KEY: optionalString,
     AI_MODEL: optionalString,
     AI_FAST_MODEL: optionalString,
-    EMBEDDING_PROVIDER: z.enum(['openai', 'mock']).default('mock'),
+    EMBEDDING_PROVIDER: z.enum(['openai', 'google', 'nvidia', 'mock']).default('mock'),
     EMBEDDING_API_KEY: optionalString,
     EMBEDDING_MODEL: optionalString,
     OPENAI_BASE_URL: optionalString,
@@ -126,8 +126,8 @@ export const envSchema = z
     if (env.AI_PROVIDER !== 'mock' && !env.AI_API_KEY) {
       ctx.addIssue({ code: 'custom', path: ['AI_API_KEY'], message: `AI_API_KEY is required for ${env.AI_PROVIDER}` });
     }
-    if (env.EMBEDDING_PROVIDER === 'openai' && !(env.EMBEDDING_API_KEY ?? env.AI_API_KEY)) {
-      ctx.addIssue({ code: 'custom', path: ['EMBEDDING_API_KEY'], message: 'EMBEDDING_API_KEY is required for openai embeddings' });
+    if (env.EMBEDDING_PROVIDER !== 'mock' && !(env.EMBEDDING_API_KEY ?? (env.AI_PROVIDER === env.EMBEDDING_PROVIDER ? env.AI_API_KEY : undefined))) {
+      ctx.addIssue({ code: 'custom', path: ['EMBEDDING_API_KEY'], message: `EMBEDDING_API_KEY is required for ${env.EMBEDDING_PROVIDER} embeddings` });
     }
     if (env.STORAGE_DRIVER === 's3') {
       for (const key of ['S3_BUCKET', 'S3_ACCESS_KEY', 'S3_SECRET_KEY'] as const) {

@@ -12,11 +12,18 @@ import { audit } from './audit.service';
 export const MODEL_SUGGESTIONS = {
   anthropic: ['claude-opus-5', 'claude-sonnet-5', 'claude-haiku-4-5', 'claude-fable-5-1'],
   openai: ['gpt-4.1', 'gpt-4.1-mini'],
-  embeddings: { openai: ['text-embedding-3-small'] },
+  // Providers rename models often: these are starting points, any model ID can be typed.
+  google: ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.5-pro'],
+  nvidia: ['meta/llama-3.3-70b-instruct', 'meta/llama-3.1-8b-instruct', 'nvidia/llama-3.3-nemotron-super-49b-v1', 'deepseek-ai/deepseek-r1', 'qwen/qwen2.5-coder-32b-instruct'],
+  embeddings: {
+    openai: ['text-embedding-3-small'],
+    google: ['gemini-embedding-001'],
+    nvidia: ['nvidia/nv-embedqa-e5-v5', 'nvidia/llama-3.2-nv-embedqa-1b-v2'],
+  },
 } as const;
 
-type Provider = 'anthropic' | 'openai' | 'mock';
-type EmbeddingProviderKey = 'openai' | 'mock';
+type Provider = 'anthropic' | 'openai' | 'google' | 'nvidia' | 'mock';
+type EmbeddingProviderKey = 'openai' | 'google' | 'nvidia' | 'mock';
 
 interface Resolved {
   provider: Provider;
@@ -45,7 +52,9 @@ function resolve(organizationId: string, row: Partial<OrganizationAiSettings> | 
   const embeddingProvider = (pick(override?.embeddingProvider, row?.embeddingProvider as EmbeddingProviderKey | null, env.EMBEDDING_PROVIDER) ?? 'mock') as EmbeddingProviderKey;
   const storedEmbKey = decrypt(organizationId, 'embeddingApiKey', row?.embeddingApiKeyEnc ?? null);
   const orgEmbKey = override?.embeddingApiKey !== undefined ? (override.embeddingApiKey ?? undefined) : storedEmbKey;
-  const embeddingApiKey = orgEmbKey ?? env.EMBEDDING_API_KEY ?? (env.AI_PROVIDER === 'openai' ? env.AI_API_KEY : undefined) ?? (provider === 'openai' ? orgKey : undefined);
+  // One key can serve both text and embeddings when they use the same service.
+  const embeddingApiKey =
+    orgEmbKey ?? (embeddingProvider === env.EMBEDDING_PROVIDER ? env.EMBEDDING_API_KEY : undefined) ?? (provider === embeddingProvider ? orgKey : undefined) ?? (env.AI_PROVIDER === embeddingProvider ? env.AI_API_KEY : undefined);
 
   // Models only fall back to env defaults when the provider is the server's provider.
   const sameProvider = provider === env.AI_PROVIDER;
@@ -54,7 +63,8 @@ function resolve(organizationId: string, row: Partial<OrganizationAiSettings> | 
     model: pick(override?.model, row?.model, sameProvider ? env.AI_MODEL : undefined),
     fastModel: pick(override?.fastModel, row?.fastModel, sameProvider ? env.AI_FAST_MODEL : undefined),
     apiKey,
-    baseUrl: (override?.baseUrl !== undefined ? override.baseUrl || undefined : row?.baseUrl) ?? env.OPENAI_BASE_URL,
+    // A custom base URL only applies to the generic OpenAI-compatible provider.
+    baseUrl: provider === 'openai' || embeddingProvider === 'openai' ? ((override?.baseUrl !== undefined ? override.baseUrl || undefined : row?.baseUrl) ?? env.OPENAI_BASE_URL) : undefined,
     embeddingProvider,
     embeddingModel: pick(override?.embeddingModel, row?.embeddingModel, embeddingProvider === env.EMBEDDING_PROVIDER ? env.EMBEDDING_MODEL : undefined),
     embeddingApiKey,
@@ -64,7 +74,7 @@ function resolve(organizationId: string, row: Partial<OrganizationAiSettings> | 
 function assertUsable(r: Resolved) {
   if (isProduction(getInfra().env) && (r.provider === 'mock' || r.embeddingProvider === 'mock')) throw badRequest('The mock AI provider is not allowed in production');
   if (r.provider !== 'mock' && !r.apiKey) throw badRequest(`Add an API key for ${r.provider}`);
-  if (r.embeddingProvider === 'openai' && !r.embeddingApiKey) throw badRequest('Add an API key for OpenAI embeddings');
+  if (r.embeddingProvider !== 'mock' && !r.embeddingApiKey) throw badRequest(`Add an API key for ${r.embeddingProvider} embeddings`);
 }
 
 function build(r: Resolved): { ai: AIProvider; embeddings: EmbeddingProvider } {

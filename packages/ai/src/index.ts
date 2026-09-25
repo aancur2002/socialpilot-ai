@@ -1,6 +1,6 @@
 export * from './providers/types';
 export { AnthropicProvider, ANTHROPIC_DEFAULT_MODEL } from './providers/anthropic';
-export { OpenAIProvider, OpenAIEmbeddingProvider } from './providers/openai';
+export { OpenAIProvider, OpenAIEmbeddingProvider, COMPATIBLE_PRESETS, fitEmbedding, type CompatibleProvider } from './providers/openai';
 export { MockAIProvider, HashingEmbeddingProvider, mockClassifyIntent } from './providers/mock';
 export { toStrictJsonSchema, extractJson } from './providers/json-schema';
 export * from './schemas';

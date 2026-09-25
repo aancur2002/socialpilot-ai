@@ -186,10 +186,10 @@ Confidence is the AI's own estimate used for routing. It isn't a guarantee of ac
 
 ### 5.2 AI models (Settings → AI models), for owners and admins
 Choose the AI used for your whole agency:
-- **Provider**: Anthropic (Claude), OpenAI (or compatible), or the server default.
+- **Provider**: Anthropic (Claude), OpenAI (or compatible), **Google Gemini** (free tier, key from aistudio.google.com), **NVIDIA NIM** (free credits, key from build.nvidia.com), or the server default. The free options are good for testing without API costs.
 - **Main model** and **Fast model**: pick a suggestion or type any model ID. The fast model handles quick tasks such as intent detection; a smaller model costs less.
 - **API key**: paste it once. It's encrypted and only its last four characters are shown afterwards. Leave it blank to use the server key from `.env`.
-- **Knowledge search (embeddings)**: OpenAI embeddings for real semantic search, or local word matching for offline development. If you change the embedding model, click **Re-index knowledge now** when prompted.
+- **Knowledge search (embeddings)**: OpenAI, Google or NVIDIA embeddings for real semantic search, or local word matching for offline development. When text and embeddings use the same service, one key covers both. If you change the embedding model, click **Re-index knowledge now** when prompted.
 - **Test connection** tries your settings without saving them. **Save AI settings** applies them within seconds.
 
 ### 5.3 Your account (Settings → Your account)

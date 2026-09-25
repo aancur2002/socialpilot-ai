@@ -112,6 +112,20 @@ describe('account, knowledge editing and AI model settings', () => {
       expect(missingKey.text).toMatchObject({ ok: false, error: expect.stringMatching(/API key/) });
     });
 
+    it('supports Google Gemini and NVIDIA, reusing one key for text and embeddings', async () => {
+      const g = await core.updateAiSettings(owner.ctx, { provider: 'google', model: null, fastModel: null, apiKey: 'AIza-test-key-5678', embeddingProvider: 'google', embeddingModel: null });
+      expect(g.effective).toMatchObject({ provider: 'google', model: 'gemini-2.5-flash', fastModel: 'gemini-2.5-flash-lite', embeddingProvider: 'google', embeddingModel: 'gemini-embedding-001', apiKeySource: 'organization' });
+      expect(g.suggestions.google.length).toBeGreaterThan(0);
+      const n = await core.updateAiSettings(owner.ctx, { provider: 'nvidia', apiKey: 'nvapi-test-key-0000', model: 'deepseek-ai/deepseek-r1', embeddingProvider: 'nvidia' });
+      expect(n.effective).toMatchObject({ provider: 'nvidia', model: 'deepseek-ai/deepseek-r1', embeddingModel: 'nvidia/nv-embedqa-e5-v5' });
+      expect(n.reindexRequired).toBe(true);
+      core.clearAiCache(owner.organizationId);
+      expect((await core.aiFor(owner.organizationId)).ai.name).toBe('nvidia');
+      // Different embedding service without its own key is rejected.
+      await expect(core.updateAiSettings(owner.ctx, { embeddingProvider: 'openai' })).rejects.toMatchObject({ status: 400 });
+      await core.updateAiSettings(owner.ctx, { provider: null, model: null, fastModel: null, apiKey: null, embeddingProvider: null, embeddingModel: null });
+    });
+
     it('is restricted to members who can manage settings', async () => {
       const { ctx: manager } = await addMember(owner.organizationId, 'MANAGER');
       await expect(core.getAiSettings(manager)).rejects.toMatchObject({ status: 403 });

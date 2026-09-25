@@ -21,7 +21,7 @@ interface AiSettingsView {
   effective: { provider: string; model: string; fastModel: string; embeddingProvider: string; embeddingModel: string; apiKeySource: 'organization' | 'server' | 'none' };
   serverDefaults: { provider: string; model: string | null; fastModel: string | null; embeddingProvider: string };
   mockAllowed: boolean;
-  suggestions: { anthropic: string[]; openai: string[]; embeddings: { openai: string[] } };
+  suggestions: Record<'anthropic' | 'openai' | 'google' | 'nvidia', string[]> & { embeddings: Record<'openai' | 'google' | 'nvidia', string[]> };
   reindexRequired?: boolean;
 }
 
@@ -30,7 +30,28 @@ interface TestResult {
   embeddings: { ok: boolean; model?: string; dimensions?: number; latencyMs?: number; error?: string };
 }
 
-const PROVIDER_NAMES: Record<string, string> = { anthropic: 'Anthropic (Claude)', openai: 'OpenAI or compatible', mock: 'Mock (offline, development only)' };
+const PROVIDER_NAMES: Record<string, string> = {
+  anthropic: 'Anthropic (Claude)',
+  openai: 'OpenAI or compatible',
+  google: 'Google Gemini',
+  nvidia: 'NVIDIA NIM',
+  mock: 'Mock (offline, development only)',
+};
+
+/** Where to get a key, shown under the provider picker. */
+const KEY_HELP: Record<string, string> = {
+  anthropic: 'Create a key at console.anthropic.com.',
+  openai: 'Create a key at platform.openai.com, or use your gateway’s key with its base URL.',
+  google: 'Free tier available: create a key at aistudio.google.com (Get API key). Free-tier limits are low and prompts may be used to improve Google’s products, so use it for testing.',
+  nvidia: 'Free credits available: sign in at build.nvidia.com, open any model and choose Get API Key (keys start with nvapi-). Good for testing Llama, Nemotron, DeepSeek and more.',
+};
+
+const EMBEDDING_NAMES: Record<string, string> = {
+  openai: 'OpenAI embeddings',
+  google: 'Google Gemini embeddings',
+  nvidia: 'NVIDIA NIM embeddings',
+  mock: 'Local word matching (development only)',
+};
 
 function KeyField({ id, label, status, value, onChange, remove, onRemove }: { id: string; label: string; status: { set: boolean; hint: string | null }; value: string; onChange: (v: string) => void; remove: boolean; onRemove: (v: boolean) => void }) {
   return (
@@ -93,7 +114,7 @@ export function AiModelSettings() {
   if (q.error) return <ErrorState error={q.error} onRetry={() => q.refetch()} />;
   const d = q.data!;
   const provider = f.provider || d.serverDefaults.provider;
-  const suggestions = provider === 'anthropic' ? d.suggestions.anthropic : provider === 'openai' ? d.suggestions.openai : [];
+  const suggestions = provider === 'mock' ? [] : (d.suggestions[provider as 'anthropic'] ?? []);
   const embeddingProvider = f.embeddingProvider || d.serverDefaults.embeddingProvider;
 
   return (
@@ -127,8 +148,11 @@ export function AiModelSettings() {
                 <option value="">Server default ({PROVIDER_NAMES[d.serverDefaults.provider] ?? d.serverDefaults.provider})</option>
                 <option value="anthropic">{PROVIDER_NAMES.anthropic}</option>
                 <option value="openai">{PROVIDER_NAMES.openai}</option>
+                <option value="google">{PROVIDER_NAMES.google} (free tier)</option>
+                <option value="nvidia">{PROVIDER_NAMES.nvidia} (free credits)</option>
                 {d.mockAllowed && <option value="mock">{PROVIDER_NAMES.mock}</option>}
               </Select>
+              {KEY_HELP[provider] && <p className="text-xs text-ink-3">{KEY_HELP[provider]}</p>}
             </Field>
             {provider !== 'mock' && (
               <>
@@ -155,18 +179,21 @@ export function AiModelSettings() {
           <div className="space-y-4 p-5">
             <Field label="Provider" htmlFor="emb-provider">
               <Select id="emb-provider" value={f.embeddingProvider} onChange={(e) => setF({ ...f, embeddingProvider: e.target.value, embeddingModel: '' })}>
-                <option value="">Server default ({d.serverDefaults.embeddingProvider === 'mock' ? 'local word matching' : 'OpenAI'})</option>
-                <option value="openai">OpenAI embeddings</option>
-                {d.mockAllowed && <option value="mock">Local word matching (development only)</option>}
+                <option value="">Server default ({EMBEDDING_NAMES[d.serverDefaults.embeddingProvider] ?? d.serverDefaults.embeddingProvider})</option>
+                <option value="openai">{EMBEDDING_NAMES.openai}</option>
+                <option value="google">{EMBEDDING_NAMES.google} (free tier)</option>
+                <option value="nvidia">{EMBEDDING_NAMES.nvidia} (free credits)</option>
+                {d.mockAllowed && <option value="mock">{EMBEDDING_NAMES.mock}</option>}
               </Select>
             </Field>
-            {embeddingProvider === 'openai' && (
+            {embeddingProvider !== 'mock' && (
               <>
-                <Field label="Embedding model" htmlFor="emb-model" hint="Must produce 1536-dimension vectors.">
-                  <Input id="emb-model" list="emb-model-options" value={f.embeddingModel} placeholder="text-embedding-3-small" onChange={(e) => setF({ ...f, embeddingModel: e.target.value })} />
-                  <datalist id="emb-model-options">{d.suggestions.embeddings.openai.map((m) => <option key={m} value={m} />)}</datalist>
+                <Field label="Embedding model" htmlFor="emb-model" hint="Vectors up to 1536 dimensions are stored as-is (smaller ones are padded without changing results). Blank uses the provider default.">
+                  <Input id="emb-model" list="emb-model-options" value={f.embeddingModel} placeholder={d.suggestions.embeddings[embeddingProvider as 'openai']?.[0] ?? ''} onChange={(e) => setF({ ...f, embeddingModel: e.target.value })} />
+                  <datalist id="emb-model-options">{(d.suggestions.embeddings[embeddingProvider as 'openai'] ?? []).map((m) => <option key={m} value={m} />)}</datalist>
                 </Field>
                 <KeyField id="emb-key" label="Embeddings API key" status={d.saved.embeddingApiKey} value={f.embeddingApiKey} onChange={(v) => setF({ ...f, embeddingApiKey: v })} remove={f.removeEmbeddingKey} onRemove={(v) => setF({ ...f, removeEmbeddingKey: v })} />
+                {embeddingProvider === provider && <p className="text-xs text-ink-3">Leave the key blank to reuse the text generation key.</p>}
               </>
             )}
             {embeddingProvider === 'mock' && <p className="text-sm text-ink-2">Local word matching works offline but only finds passages that share words with the question. Use OpenAI embeddings in production.</p>}
