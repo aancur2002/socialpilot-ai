@@ -74,7 +74,36 @@ export const COMPATIBLE_PRESETS: Record<CompatibleProvider, Preset> = {
 
 type FetchImpl = typeof fetch;
 
+/** Brief pause before retrying a temporary overload; honors Retry-After up to 5 seconds. */
+function retryDelayMs(res: Response): number {
+  const header = Number(res.headers.get('retry-after'));
+  return Number.isFinite(header) && header > 0 ? Math.min(header * 1000, 5000) : 1500;
+}
+
+/**
+ * Calls the service, retrying once after a short pause on 503 (overloaded) or 429
+ * (rate limited), since those often clear within seconds. Persistent failures are
+ * left to the caller, where a failover chain moves on to the next provider.
+ */
 async function compatibleFetch<T>(fetchImpl: FetchImpl, label: string, baseUrl: string, apiKey: string, path: string, body?: unknown): Promise<T> {
+  try {
+    return await compatibleFetchOnce<T>(fetchImpl, label, baseUrl, apiKey, path, body);
+  } catch (error) {
+    if (error instanceof TemporaryOverload) {
+      await new Promise((r) => setTimeout(r, error.delayMs));
+      return compatibleFetchOnce<T>(fetchImpl, label, baseUrl, apiKey, path, body, true);
+    }
+    throw error;
+  }
+}
+
+class TemporaryOverload extends Error {
+  constructor(readonly delayMs: number) {
+    super('temporary overload');
+  }
+}
+
+async function compatibleFetchOnce<T>(fetchImpl: FetchImpl, label: string, baseUrl: string, apiKey: string, path: string, body?: unknown, isRetry = false): Promise<T> {
   let res: Response;
   try {
     res = await fetchImpl(`${baseUrl.replace(/\/$/, '')}${path}`, {
@@ -85,6 +114,9 @@ async function compatibleFetch<T>(fetchImpl: FetchImpl, label: string, baseUrl: 
     });
   } catch {
     throw new AiProviderError(`Could not reach the ${label} API`, true, 'network');
+  }
+  if (!res.ok && !isRetry && (res.status === 503 || res.status === 429)) {
+    throw new TemporaryOverload(retryDelayMs(res));
   }
   if (!res.ok) {
     // Include the provider's own error text (never the key) so the settings test is actionable.

@@ -71,6 +71,26 @@ describe('OpenAI-compatible providers', () => {
     expect(calls).toHaveLength(1);
   });
 
+  it('retries once after a short pause when the service is temporarily overloaded', async () => {
+    const { impl, calls } = fakeFetch([
+      { status: 503, body: [{ error: { message: 'This model is currently experiencing high demand.' } }] },
+      completion('OK'),
+    ]);
+    const res = await new OpenAIProvider({ apiKey: 'k', kind: 'google', fetchImpl: impl }).generateText({ system: 's', messages: [{ role: 'user', content: 'x' }] });
+    expect(res.text).toBe('OK');
+    expect(calls).toHaveLength(2);
+  });
+
+  it('reports a persistent overload with the provider message after one retry', async () => {
+    const overloaded = { status: 503, body: [{ error: { message: 'This model is currently experiencing high demand.' } }] };
+    const { impl, calls } = fakeFetch([overloaded, overloaded]);
+    await expect(new OpenAIProvider({ apiKey: 'k', kind: 'google', fetchImpl: impl }).generateText({ system: 's', messages: [{ role: 'user', content: 'x' }] })).rejects.toMatchObject({
+      kind: 'server',
+      message: expect.stringMatching(/HTTP 503: This model is currently experiencing high demand/),
+    });
+    expect(calls).toHaveLength(2);
+  });
+
   it('reads Gemini errors wrapped in an array (so a 404 names the missing model)', async () => {
     const { impl } = fakeFetch([{ status: 404, body: [{ error: { code: 404, message: 'models/gemini-2.5-flash is not found for API version v1main' } }] }]);
     await expect(new OpenAIProvider({ apiKey: 'k', kind: 'google', fetchImpl: impl }).generateText({ system: 's', messages: [{ role: 'user', content: 'x' }] })).rejects.toThrow(/HTTP 404: models\/gemini-2.5-flash is not found/);
