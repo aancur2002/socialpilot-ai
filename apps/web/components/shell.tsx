@@ -25,6 +25,7 @@ import {
   Workflow,
   X,
   CreditCard,
+  FileInput,
 } from 'lucide-react';
 import Link from 'next/link';
 import { daysUntil } from './billing';
@@ -56,6 +57,7 @@ const NAV: { group: string; items: NavItem[] }[] = [
       { href: '/content/new', label: 'AI content', icon: Sparkles, permission: 'content:create' },
       { href: '/calendar', label: 'Calendar', icon: CalendarDays, permission: 'content:view' },
       { href: '/leads', label: 'Leads', icon: Users, permission: 'leads:view' },
+      { href: '/lead-capture', label: 'Lead capture', icon: FileInput, permission: 'leads:view' },
       { href: '/analytics', label: 'Analytics', icon: BarChart3, permission: 'analytics:view' },
     ],
   },

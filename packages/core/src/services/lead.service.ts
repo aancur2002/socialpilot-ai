@@ -14,6 +14,7 @@ const leadInclude = {
   conversation: { select: { id: true, platform: true, lastMessagePreview: true } },
   notes: { orderBy: { createdAt: 'desc' }, take: 50 },
   client: { select: { id: true, name: true } },
+  form: { select: { id: true, name: true } },
 } satisfies Prisma.LeadInclude;
 
 export async function listLeads(ctx: ServiceContext, query: { clientId?: string; status?: LeadStatus; search?: string; limit: number; cursor?: string }) {
@@ -21,7 +22,7 @@ export async function listLeads(ctx: ServiceContext, query: { clientId?: string;
   const where: Prisma.LeadWhereInput = { ...tenantWhere(ctx, query.clientId) };
   if (query.status) where.status = query.status;
   if (query.search) {
-    where.OR = ['name', 'username', 'email', 'phone', 'interest'].map((f) => ({ [f]: { contains: query.search, mode: 'insensitive' } }));
+    where.OR = [...['name', 'username', 'email', 'phone', 'interest', 'company', 'message'].map((f) => ({ [f]: { contains: query.search, mode: 'insensitive' } })), { tags: { has: query.search.trim() } }];
   }
   const rows = await getInfra().db.lead.findMany({
     where,

@@ -1,10 +1,12 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { LockKeyhole } from 'lucide-react';
+import { CreditCard, LockKeyhole } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import { humanize, when } from './domain';
-import { Badge, Button, ErrorState, Panel, PanelHeader, Skeleton, Table, Td, Th } from './ui/primitives';
-import { api } from '@/lib/api';
+import { Badge, Button, ErrorState, Panel, PanelHeader, Select, Skeleton, Table, Td, Th } from './ui/primitives';
+import { api, errorMessage } from '@/lib/api';
 
 export type Access =
   | { state: 'active' }
@@ -46,6 +48,7 @@ interface Billing {
   paidUntil: string | null;
   access: Access;
   paymentInstructions: string | null;
+  cardPayments: boolean;
   limits: Record<string, number>;
   usage: Record<string, number>;
   payments: { id: string; amountCents: number; currency: string; method: string; periodStart: string; periodEnd: string; createdAt: string }[];
@@ -88,6 +91,7 @@ export function BillingPanel() {
           )}
         </dl>
         {b.access.state === 'blocked' && <p className="border-t border-line px-5 py-3 text-sm text-alert">{b.access.message}</p>}
+        {b.cardPayments && b.priceCents > 0 && <PayByCard priceCents={b.priceCents} currency={b.currency} />}
         {b.paymentInstructions && b.priceCents > 0 && (
           <div className="border-t border-line px-5 py-4">
             <h3 className="mb-1 text-sm font-medium">How to pay</h3>
@@ -151,6 +155,43 @@ export function BlockedScreen({ orgName, access, canSeeBilling, onSignOut, other
         ))}
         <Button variant="ghost" onClick={onSignOut}>Sign out</Button>
       </div>
+    </div>
+  );
+}
+
+/** Shown only when the platform admin has switched card payments on. */
+function PayByCard({ priceCents, currency }: { priceCents: number; currency: string }) {
+  const [months, setMonths] = useState(1);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search).get('payment');
+    if (p === 'success') toast.success('Payment received. It can take a minute to show here.');
+    if (p === 'cancelled') toast.message('Payment cancelled. Nothing was charged.');
+  }, []);
+  return (
+    <div className="border-t border-line px-5 py-4">
+      <h3 className="mb-2 text-sm font-medium">Pay by card</h3>
+      <div className="flex flex-wrap items-center gap-2">
+        <Select aria-label="Months to pay" className="w-auto" value={months} onChange={(e) => setMonths(Number(e.target.value))}>
+          {[1, 3, 6, 12].map((m) => <option key={m} value={m}>{m} month{m === 1 ? '' : 's'}: {money(priceCents * m, currency)}</option>)}
+        </Select>
+        <Button
+          loading={busy}
+          onClick={async () => {
+            setBusy(true);
+            try {
+              const { url } = await api<{ url: string }>('/billing/checkout', { body: { months } });
+              window.location.assign(url);
+            } catch (e) {
+              toast.error(errorMessage(e));
+              setBusy(false);
+            }
+          }}
+        >
+          <CreditCard className="h-4 w-4" /> Pay {money(priceCents * months, currency)}
+        </Button>
+      </div>
+      <p className="mt-2 text-xs text-ink-3">You&apos;ll pay on a secure Stripe page, then come back here.</p>
     </div>
   );
 }

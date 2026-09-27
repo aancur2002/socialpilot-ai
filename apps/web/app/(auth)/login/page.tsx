@@ -42,6 +42,9 @@ export default function LoginPage() {
         <Field label="Password" htmlFor="password" error={formState.errors.password?.message}>
           <Input id="password" type="password" autoComplete="current-password" {...register('password')} />
         </Field>
+        <div className="-mt-2 text-right">
+          <Link href="/forgot-password" className="text-sm text-clearance hover:underline">Forgot password?</Link>
+        </div>
         {error && (
           <p role="alert" className="rounded-[var(--radius-control)] bg-alert-soft px-3 py-2 text-sm text-alert">
             {error}

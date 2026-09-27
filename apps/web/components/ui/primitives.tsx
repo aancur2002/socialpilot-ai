@@ -127,14 +127,14 @@ export function Switch({ checked, onChange, label, disabled }: { checked: boolea
 
 export function Tabs<T extends string>({ value, onChange, items }: { value: T; onChange: (v: T) => void; items: { value: T; label: ReactNode }[] }) {
   return (
-    <div role="tablist" className="flex gap-1 border-b border-line">
+    <div role="tablist" className="flex gap-1 overflow-x-auto border-b border-line">
       {items.map((it) => (
         <button
           key={it.value}
           role="tab"
           aria-selected={value === it.value}
           onClick={() => onChange(it.value)}
-          className={cn('-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors', value === it.value ? 'border-clearance text-ink' : 'border-transparent text-ink-3 hover:text-ink')}
+          className={cn('-mb-px shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors', value === it.value ? 'border-clearance text-ink' : 'border-transparent text-ink-3 hover:text-ink')}
         >
           {it.label}
         </button>

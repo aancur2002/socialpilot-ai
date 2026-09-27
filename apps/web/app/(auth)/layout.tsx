@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import type { ReactNode } from 'react';
 
 /** Example strips shown beside the auth forms: the product's own vocabulary, not marketing copy. */
@@ -29,7 +30,13 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
         <p className="text-xs text-rail-ink">Connects through each platform’s official API. No passwords stored.</p>
       </aside>
       <main className="flex items-center justify-center px-4 py-12 sm:px-8">
-        <div className="w-full max-w-sm">{children}</div>
+        <div className="w-full max-w-sm">
+          {children}
+          <p className="mt-10 flex gap-4 text-xs text-ink-3">
+            <Link href="/terms" className="hover:underline">Terms of Service</Link>
+            <Link href="/privacy" className="hover:underline">Privacy Policy</Link>
+          </p>
+        </div>
       </main>
     </div>
   );

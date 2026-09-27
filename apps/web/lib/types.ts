@@ -271,6 +271,17 @@ export interface Lead {
   status: LeadStatus;
   value: number | null;
   assignedToId: string | null;
+  company: string | null;
+  message: string | null;
+  tags: string[];
+  followUpAt: string | null;
+  lostReason: string | null;
+  pageUrl: string | null;
+  utmSource: string | null;
+  utmMedium: string | null;
+  utmCampaign: string | null;
+  customFields: Record<string, string>;
+  form?: { id: string; name: string } | null;
   createdAt: string;
   client?: { name: string };
   contact?: { name: string | null; username: string | null } | null;

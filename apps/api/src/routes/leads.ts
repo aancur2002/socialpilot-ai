@@ -92,7 +92,13 @@ export async function passwordResetRoutes(app: FastifyInstance) {
 export async function platformSettingsRoutes(app: FastifyInstance) {
   const groups = { company: companySettingsSchema, legal: legalSettingsSchema, email: emailSettingsSchema } as const;
   const groupParam = z.object({ group: z.enum(['company', 'legal', 'email', 'stripe']) });
-  app.get('/admin/platform/:group', { schema: { tags: ['admin'] } }, async (req) => core.adminGetPlatformGroup(requireUser(req), parse(groupParam, req.params).group));
+  app.get('/admin/platform/:group', { schema: { tags: ['admin'] } }, async (req) => {
+    const { group } = parse(groupParam, req.params);
+    const data = await core.adminGetPlatformGroup(requireUser(req), group);
+    if (group !== 'stripe') return data;
+    const { env } = core.getInfra();
+    return { ...data, webhookUrl: `${env.WEBHOOK_BASE_URL ?? env.API_URL}/webhooks/stripe` };
+  });
   app.put('/admin/platform/:group', { schema: { tags: ['admin'] } }, async (req) => {
     const user = requireUser(req);
     const { group } = parse(groupParam, req.params);

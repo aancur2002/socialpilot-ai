@@ -65,6 +65,9 @@ export default function RegisterPage() {
         <Button type="submit" className="w-full" loading={formState.isSubmitting}>
           Create account
         </Button>
+        <p className="text-xs text-ink-3">
+          By creating an account you agree to the <Link href="/terms" className="text-clearance hover:underline">Terms of Service</Link> and <Link href="/privacy" className="text-clearance hover:underline">Privacy Policy</Link>.
+        </p>
       </form>
       <p className="mt-6 text-sm text-ink-2">
         Already have an account?{' '}

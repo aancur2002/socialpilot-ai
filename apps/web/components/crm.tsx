@@ -10,7 +10,7 @@ import { toast } from 'sonner';
 import { api, errorMessage } from '@/lib/api';
 import { useSession } from '@/lib/session';
 import type { Lead, LeadStatus, Paged, PlatformKey } from '@/lib/types';
-import { ago, humanize, PlatformChip } from './domain';
+import { ago, humanize, PlatformChip, when } from './domain';
 import { Modal } from './ui/overlay';
 import { Badge, Button, cn, EmptyState, ErrorState, Field, Input, Select, Skeleton, Table, Td, Th, Textarea } from './ui/primitives';
 
@@ -58,6 +58,14 @@ export function NewLeadButton() {
   );
 }
 
+/** Short, readable name for where a lead came from. */
+export function sourceName(source: string) {
+  if (source.startsWith('ai:')) return 'AI (conversation)';
+  if (source === 'website_form') return 'Website form';
+  if (source === 'api') return 'Lead API';
+  return humanize(source);
+}
+
 export function LeadsTable() {
   const { clientId } = useSession();
   const [status, setStatus] = useState('');
@@ -66,7 +74,7 @@ export function LeadsTable() {
   return (
     <>
       <div className="flex flex-wrap gap-2 border-b border-line p-3">
-        <Input className="max-w-xs" aria-label="Search leads" placeholder="Search name, email, interest" value={search} onChange={(e) => setSearch(e.target.value)} />
+        <Input className="max-w-xs" aria-label="Search leads" placeholder="Search name, email, company, tag" value={search} onChange={(e) => setSearch(e.target.value)} />
         <Select className="max-w-44" aria-label="Stage" value={status} onChange={(e) => setStatus(e.target.value)}>
           <option value="">All stages</option>
           {LEAD_STAGES.map((s) => <option key={s} value={s}>{humanize(s)}</option>)}
@@ -78,7 +86,7 @@ export function LeadsTable() {
       {!!q.data?.items.length && (
         <Table>
           <thead>
-            <tr><Th>Lead</Th><Th>Interested in</Th><Th>Source</Th><Th>Stage</Th><Th className="text-right">Value</Th><Th>Created</Th></tr>
+            <tr><Th>Lead</Th><Th>Interested in</Th><Th>Source</Th><Th>Stage</Th><Th className="text-right">Value</Th><Th>Follow up</Th><Th>Created</Th></tr>
           </thead>
           <tbody>
             {q.data.items.map((l) => (
@@ -90,10 +98,11 @@ export function LeadsTable() {
                   </Link>
                   <span className="text-xs text-ink-3">{[l.email, l.phone].filter(Boolean).join(', ') || l.client?.name}</span>
                 </Td>
-                <Td className="max-w-64 truncate text-ink-2">{l.interest ?? '—'}</Td>
-                <Td className="text-ink-2">{l.source.startsWith('ai:') ? 'Detected by AI' : l.source}</Td>
+                <Td className="max-w-64 truncate text-ink-2">{l.interest ?? l.company ?? '—'}</Td>
+                <Td className="text-ink-2">{sourceName(l.source)}</Td>
                 <Td><LeadStatusBadge status={l.status} /></Td>
                 <Td className="text-right tabular-nums">{l.value ? l.value.toLocaleString() : '—'}</Td>
+                <Td className={l.followUpAt && new Date(l.followUpAt) < new Date() && !['WON', 'LOST'].includes(l.status) ? 'font-medium text-alert' : 'text-ink-2'}>{l.followUpAt ? when(l.followUpAt) : '—'}</Td>
                 <Td className="text-ink-2">{ago(l.createdAt)}</Td>
               </tr>
             ))}

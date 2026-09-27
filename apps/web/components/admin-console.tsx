@@ -3,6 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { CustomersPanel, PlansPanel } from './admin-customers';
+import { CompanyLegalPanel, EmailPanel, PaymentsPanel } from './admin-settings';
 import { IntegrationsSetup } from './integrations-setup';
 import { ago, humanize, PlatformChip, when } from '@/components/domain';
 import { Badge, EmptyState, ErrorState, PageHeader, Panel, PanelHeader, Skeleton, Table, Tabs, Td, Th } from '@/components/ui/primitives';
@@ -18,7 +19,7 @@ interface Overview {
 interface QueueInfo { name: string; counts: Record<string, number>; recentFailures: { id: string; attemptsMade: number; failedReason?: string; timestamp: number }[] }
 interface Health { status: string; checks: Record<string, { ok: boolean; latencyMs?: number; detail?: string }> }
 
-type AdminTab = 'overview' | 'customers' | 'plans' | 'integrations' | 'users' | 'queues' | 'audit';
+type AdminTab = 'overview' | 'customers' | 'plans' | 'company' | 'email' | 'payments' | 'integrations' | 'users' | 'queues' | 'audit';
 
 export function AdminConsole({ enabled, initialTab = 'overview' }: { enabled: boolean; initialTab?: AdminTab }) {
   const [tab, setTab] = useState<AdminTab>(initialTab);
@@ -38,7 +39,7 @@ export function AdminConsole({ enabled, initialTab = 'overview' }: { enabled: bo
           {Object.entries(health.data.checks).map(([k, v]) => <Badge key={k} tone={v.ok ? 'clearance' : 'alert'} title={v.detail}>{humanize(k)} {v.ok ? `${v.latencyMs}ms` : 'down'}</Badge>)}
         </div>
       )}
-      <div className="mb-4"><Tabs value={tab} onChange={setTab} items={[{ value: 'overview', label: 'Overview' }, { value: 'customers', label: 'Customers' }, { value: 'plans', label: 'Plans & billing' }, { value: 'integrations', label: 'Integrations' }, { value: 'users', label: 'Users' }, { value: 'queues', label: 'Queues' }, { value: 'audit', label: 'Audit' }]} /></div>
+      <div className="mb-4"><Tabs value={tab} onChange={setTab} items={[{ value: 'overview', label: 'Overview' }, { value: 'customers', label: 'Customers' }, { value: 'plans', label: 'Plans & billing' }, { value: 'payments', label: 'Payments' }, { value: 'company', label: 'Company & legal' }, { value: 'email', label: 'Email' }, { value: 'integrations', label: 'Integrations' }, { value: 'users', label: 'Users' }, { value: 'queues', label: 'Queues' }, { value: 'audit', label: 'Audit' }]} /></div>
       {tab === 'overview' && (overview.isLoading ? <Skeleton className="h-48" /> : overview.error ? <ErrorState error={overview.error} /> : overview.data && (
         <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
           <Panel>
@@ -70,6 +71,9 @@ export function AdminConsole({ enabled, initialTab = 'overview' }: { enabled: bo
       {tab === 'integrations' && <IntegrationsSetup />}
       {tab === 'customers' && <CustomersPanel />}
       {tab === 'plans' && <PlansPanel />}
+      {tab === 'payments' && <PaymentsPanel />}
+      {tab === 'company' && <CompanyLegalPanel />}
+      {tab === 'email' && <EmailPanel />}
       {tab === 'users' && <Panel><Table><thead><tr><Th>User</Th><Th>Organizations</Th><Th>Last sign-in</Th></tr></thead><tbody>{users.data?.map((u) => <tr key={u.id}><Td><span className="font-medium">{u.name}</span> {u.isSuperAdmin && <Badge tone="sky">Admin</Badge>}<p className="text-xs text-ink-3">{u.email}</p></Td><Td className="tabular-nums">{u._count.memberships}</Td><Td className="text-ink-2">{u.lastLoginAt ? ago(u.lastLoginAt) : 'Never'}</Td></tr>)}</tbody></Table></Panel>}
       {tab === 'queues' && (
         <div className="space-y-4">

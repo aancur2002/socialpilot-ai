@@ -67,3 +67,21 @@ export function errorMessage(error: unknown): string {
   }
   return error instanceof Error ? error.message : 'Something went wrong';
 }
+
+/** Downloads a file from the API (sends the organization header a plain link can't). */
+export async function downloadFile(path: string, query: Query, filename: string): Promise<void> {
+  const url = new URL(`/api/v1${path}`, window.location.origin);
+  for (const [k, v] of Object.entries(query)) if (v !== undefined && v !== null && v !== '') url.searchParams.set(k, String(v));
+  const org = getCurrentOrg();
+  const res = await fetch(url, { headers: org ? { 'x-organization-id': org } : {}, credentials: 'same-origin' });
+  if (!res.ok) {
+    const err = ((await res.json().catch(() => ({}))) as { error?: { code?: string; message?: string } }).error;
+    throw new ApiError(res.status, err?.code ?? 'ERROR', err?.message ?? `Download failed (${res.status})`);
+  }
+  const href = URL.createObjectURL(await res.blob());
+  const a = Object.assign(document.createElement('a'), { href, download: filename });
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(href), 1000);
+}
