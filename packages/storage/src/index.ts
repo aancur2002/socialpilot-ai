@@ -82,7 +82,7 @@ export class S3Storage implements StorageProvider {
   }
 }
 
-/** Development-only filesystem driver. Files are served by the API at /media/local/<key>. */
+/** Filesystem driver for development or a single server with a persistent volume. Files are served by the API at /media/local/<key>. */
 export class LocalStorage implements StorageProvider {
   readonly driver = 'local' as const;
   private readonly root: string;

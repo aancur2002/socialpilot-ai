@@ -54,7 +54,7 @@ export function buildInfra(env: Env = getEnv()): Infra {
           publicUrl: env.S3_PUBLIC_URL,
           forcePathStyle: env.S3_FORCE_PATH_STYLE,
         })
-      : new LocalStorage(join(repoRoot(), '.data', 'storage'), env.API_URL);
+      : new LocalStorage(env.LOCAL_STORAGE_DIR ?? join(repoRoot(), '.data', 'storage'), env.API_URL);
 
   return {
     env,

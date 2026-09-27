@@ -1,0 +1,32 @@
+# Production reverse proxy: automatic HTTPS (Let's Encrypt) for one domain.
+# Point your domain's DNS A/AAAA record at this server, set DOMAIN and ACME_EMAIL in .env.
+{
+	email {$ACME_EMAIL}
+}
+
+{$DOMAIN} {
+	encode zstd gzip
+
+	# API: JSON API, OAuth callbacks, platform webhooks (Meta, Stripe), uploaded media, health.
+	@api path /api/* /webhooks/* /media/local/* /health /ready
+	handle @api {
+		reverse_proxy api:4000
+	}
+
+	# Everything else: the web app.
+	handle {
+		reverse_proxy web:3000
+	}
+
+	header {
+		# Web pages set their own framing rules; this covers API responses too.
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		-Server
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}

@@ -28,8 +28,13 @@ Work remaining after the MVP, grouped by priority. Finished work is recorded in 
 - [ ] Adapters for YouTube, X, Pinterest, Google Business Profile and Threads.
 
 ## Platform and operations
-- [ ] SMTP (or provider) transport for notification emails, plus per-user notification preferences.
-- [ ] Email verification, password reset and optional MFA.
+- [x] SMTP email (Platform admin → Email): notifications, invitations, password resets, lead alerts.
+- [ ] Per-user notification preferences.
+- [x] Password reset by email link.
+- [ ] Email verification at sign-up and optional MFA.
+- [ ] Turn on Stripe card payments (built, inactive): add keys in Platform admin → Payments, check, switch on.
+- [ ] Self-service account deletion and data export for customers (GDPR).
+- [ ] Upload malware scanning (ClamAV) before accepting documents from untrusted users.
 - [ ] Per-account login lockout, in addition to the per-IP limit.
 - [ ] Malware scanning for uploaded documents.
 - [ ] CI pipeline running typecheck, lint, unit, integration (with service containers) and E2E.

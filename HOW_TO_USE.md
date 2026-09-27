@@ -150,13 +150,25 @@ Example: when a direct message arrives and the text contains "wholesale", set pr
 
 Safety rules always apply. An "auto-send" rule can't override escalation of complaints, legal issues or low confidence.
 
-### 4.9 Leads and contacts
-- **Leads** are created automatically when a customer shows buying intent (asks about price, booking or a quote), including any email or phone they shared. You can also **Add lead** yourself.
-- Open a lead to change its stage, assign an owner, add notes, or jump to the source conversation.
+### 4.9 Leads and contacts (CRM)
+- **Leads** come from four places: customers showing buying intent in messages (found by the AI), **website forms**, the **lead API**, and **Add lead**. A repeat form or API submission with the same email or phone is added to the open lead as a note instead of creating a duplicate.
+- Open a lead to see what they wrote and their form answers, change the stage (and why it was lost), assign an owner, set a **follow-up date** (the owner gets a reminder when it's due), edit contact details and tags, add notes, and see where it came from (form, page, campaign). **Email**, **Call** and **WhatsApp** buttons start a conversation.
+- The leads list searches name, email, company and tags, shows follow-ups (overdue in red), and **Export CSV** downloads everything for a spreadsheet.
 - **Pipeline view**: drag leads between stages.
 - **Contacts**: everyone who has messaged or commented. **Click a contact to edit** name, email, phone, tags and notes.
 
-### 4.10 Analytics and reports
+### 4.10 Lead capture: website forms, lead API and webhooks
+Open **Lead capture** in the menu.
+- **Website forms:** **New form** → pick the client, write the heading, and choose the questions (each one "saves to" a lead field such as Name, Email, Phone, Company or Message, or is kept as an extra answer). Optional: a thank-you page, extra emails to alert, and **Only allow on these websites** so nobody copies the form elsewhere. Then **Get code**:
+  - **Embed code**: two lines to paste into the client's website (WordPress, Wix, Squarespace, Webflow, Shopify: any HTML or code block). The form matches the site's width and isn't affected by its styles.
+  - **Iframe**, for site builders that only allow iframes.
+  - **Shareable link**, for Instagram bios, Facebook buttons, WhatsApp, QR codes and email signatures.
+  Submissions become leads with the page and campaign (UTM) they came from, and the team gets a notification.
+- **API & webhooks** (owners, admins, managers):
+  - **Lead API**: create a key per client, then send leads from Zapier, Make or a website backend with a POST to `/api/v1/public/leads` (the page shows a ready-made example).
+  - **Webhooks**: send new leads (and optionally stage changes) to another CRM, Google Sheets through Zapier or Make, Slack, or your own system. Each delivery is signed; **Test** sends the latest lead.
+
+### 4.11 Analytics and reports
 **Analytics** has these tabs:
 - **Overview**: activity and platform metrics.
 - **Content**: per-post results.
@@ -167,7 +179,7 @@ Safety rules always apply. An "auto-send" rule can't override escalation of comp
 
 Metrics a platform doesn't provide show as unavailable, never estimated. Numbers from mock accounts are labelled as simulated. **Refresh metrics** collects the latest data now; otherwise collection runs every 6 hours.
 
-### 4.11 Notifications
+### 4.12 Notifications
 The bell (top right) shows new leads, approvals needed, failed posts, escalations and accounts that need reconnecting.
 
 ## 5. Settings you can change in the dashboard
@@ -219,7 +231,14 @@ Every customer is a separate organization: their own users, clients, posts, inbo
 
 **When access stops:** a customer is paused when their trial ends unpaid, their payment is overdue beyond the grace period, you cancel them, or you **Suspend** them (with a reason they'll see). Paused users can only see why and their billing page. Their scheduled posts wait instead of failing, incoming messages are still saved, and no AI replies are drafted, so no AI credits are spent. **Restore access** or record a payment and everything resumes within about 15 seconds. Free-plan and complimentary customers are never paused for payment.
 
-**Password help:** **Manage → Users → Reset password** generates a new password, signs that user out everywhere, and shows the new password once.
+**Password help:** users can click **Forgot password?** on the sign-in page to get a reset link by email (needs Email set up, below). You can also use **Manage → Users → Reset password**, which generates a new password, signs that user out everywhere, and shows the new password once.
+
+**Other Platform admin settings:**
+- **Company & legal:** your product name, company details and support email (used in emails, forms and legal pages), and the **Terms of Service** and **Privacy Policy** shown at `/terms` and `/privacy`. A template filled with your details is shown until you paste your own text. Meta asks for the privacy policy link during App Review.
+- **Email:** your SMTP provider for invitations, password resets, lead alerts and notifications. Until it's on, emails are only written to the server log. **Send test email** checks it.
+- **Payments:** card payments through Stripe, **inactive** for now. When you're ready: save the three Stripe keys, click **Check keys**, then switch it on. Customers then see **Pay by card** on their billing page and payments are recorded automatically.
+
+**Putting it on a server:** see `docs/deployment.md` (Docker with automatic HTTPS and daily backups).
 
 ## 7. Going live with real social accounts
 

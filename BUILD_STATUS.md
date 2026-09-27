@@ -65,7 +65,13 @@ Last full run: `npm run typecheck` passed, `npm run lint` passed, `npm test` 116
 - [x] Analytics snapshots (append-only), overview, content, platform, lead and AI performance. **I**, **M**
 - [x] AnalyticsAgent reports (stored numbers only, caveats for mock data). **I**
 - [x] In-app notifications. **I**, **M**
-- [~] Email notifications: architecture and log driver only; no SMTP transport.
+- [x] Email: SMTP via Platform admin (notifications, invitations, password resets, lead alerts); log-only until configured.
+- [x] SaaS billing: customer accounts created by the platform admin, plan prices and limits, trials, grace period, manual payments, automatic pausing, suspension, customer billing page.
+- [x] Card payments (Stripe Checkout + signed webhook): built and tested, **inactive** until keys pass a check and it's switched on.
+- [x] Lead capture: website forms (embed script, iframe, hosted link), lead API with keys, signed outgoing webhooks.
+- [x] CRM: company, message, custom answers, tags, follow-up reminders, lost reason, UTM/page source, CSV export.
+- [x] Legal pages (/terms, /privacy) with editable text; forgot/reset password; per-account login lockout.
+- [x] Production: docker-compose.prod.yml with Caddy (automatic HTTPS), private Postgres/Redis, daily verified backups with restore, CSP and HSTS; docs/deployment.md.
 
 ## Phase 8: Production integrations
 Adapters are implemented against the official APIs. **None has been run with real credentials**, so none is marked production-ready.

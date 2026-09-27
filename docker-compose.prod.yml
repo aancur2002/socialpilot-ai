@@ -1,0 +1,141 @@
+name: socialpilot-prod
+
+# Production on one server: automatic HTTPS, database, Redis, app and daily backups.
+#   cp env.production.example .env      # then fill it in (see docs/deployment.md)
+#   docker compose -f docker-compose.prod.yml up -d --build
+# Only ports 80 and 443 are exposed; everything else talks on the internal network.
+
+x-app: &app
+  env_file: .env
+  restart: unless-stopped
+  environment: &app-env
+    NODE_ENV: production
+    APP_ENV: production
+    APP_URL: https://${DOMAIN:?Set DOMAIN in .env}
+    API_URL: https://${DOMAIN}
+    WEBHOOK_BASE_URL: https://${DOMAIN}
+    CORS_ORIGINS: https://${DOMAIN}
+    DATABASE_URL: postgresql://${POSTGRES_USER:-socialpilot}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-socialpilot}?schema=public
+    REDIS_URL: redis://:${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}@redis:6379
+    STORAGE_DRIVER: ${STORAGE_DRIVER:-local}
+    ALLOW_LOCAL_STORAGE: "true"
+    LOCAL_STORAGE_DIR: /data/storage
+    SOCIAL_MOCK_MODE: "false"
+  logging: &logging
+    driver: json-file
+    options: { max-size: "20m", max-file: "5" }
+
+services:
+  caddy:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL:?Set ACME_EMAIL in .env (for HTTPS certificate notices)}
+    volumes:
+      - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [web, api]
+    logging: *logging
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-socialpilot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-socialpilot}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-socialpilot} -d ${POSTGRES_DB:-socialpilot}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    shm_size: 256mb
+    logging: *logging
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # AOF persistence; BullMQ needs noeviction so queued jobs are never dropped.
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction", "--requirepass", "${REDIS_PASSWORD}"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD}\" --no-auth-warning ping | grep PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    logging: *logging
+
+  api:
+    <<: *app
+    build: { context: ., dockerfile: infra/docker/Dockerfile, target: api }
+    image: socialpilot-api
+    volumes:
+      - storage:/data/storage
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:4000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+  worker:
+    <<: *app
+    build: { context: ., dockerfile: infra/docker/Dockerfile, target: worker }
+    image: socialpilot-worker
+    volumes:
+      - storage:/data/storage
+    depends_on:
+      api: { condition: service_healthy }
+
+  web:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile
+      target: web
+      args: { API_URL: "http://api:4000" }
+    image: socialpilot-web
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+    depends_on:
+      api: { condition: service_healthy }
+    logging: *logging
+
+  backup:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    entrypoint: ["/scripts/backup.sh"]
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-socialpilot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-socialpilot}
+      BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-14}
+      BACKUP_INTERVAL_HOURS: ${BACKUP_INTERVAL_HOURS:-24}
+    volumes:
+      - ./infra/backup:/scripts:ro
+      - ${BACKUP_DIR:-./backups}:/backups
+      - storage:/storage
+    depends_on:
+      postgres: { condition: service_healthy }
+    logging: *logging
+
+volumes:
+  pgdata:
+  redisdata:
+  storage:
+  caddy_data:
+  caddy_config:

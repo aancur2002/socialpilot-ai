@@ -43,15 +43,28 @@ export async function register(input: RegisterInput, meta: { ip?: string; userAg
   return { ...session, organizationId, user: { id: user.id, email: user.email, name: user.name, isSuperAdmin: user.isSuperAdmin } };
 }
 
+const LOGIN_MAX_FAILURES = 10;
+const LOGIN_LOCK_SECONDS = 15 * 60;
+const loginKey = (email: string) => `socialpilot:login-fail:${sha256(email.trim().toLowerCase())}`;
+
 export async function login(input: LoginInput, meta: { ip?: string; userAgent?: string }): Promise<SessionResult> {
-  const { db } = getInfra();
+  const { db, redis } = getInfra();
+  // Per-account lockout on top of the per-IP limit, so guessing from many addresses doesn't work.
+  // Keyed by the typed email, so it behaves the same whether or not the account exists.
+  const failures = Number(await redis.get(loginKey(input.email))) || 0;
+  if (failures >= LOGIN_MAX_FAILURES) {
+    throw new AppError('RATE_LIMITED', 'Too many failed sign-ins for this email. Try again in 15 minutes, or reset your password.');
+  }
   const user = await db.user.findUnique({ where: { email: input.email } });
   // Always run a hash comparison so response time doesn't reveal whether the email exists.
   const valid = await verifyPassword(input.password, user?.passwordHash ?? DUMMY_PASSWORD_HASH);
   if (!user || !user.passwordHash || !valid || user.disabledAt) {
     await auditGlobal({ action: 'user.login_failed', resourceType: 'User', resourceId: user?.id, ip: meta.ip, userAgent: meta.userAgent, after: { email: input.email } });
+    const n = await redis.incr(loginKey(input.email));
+    if (n === 1) await redis.expire(loginKey(input.email), LOGIN_LOCK_SECONDS);
     throw new AppError('UNAUTHENTICATED', 'Invalid email or password');
   }
+  await redis.del(loginKey(input.email));
   const session = await createSession(user.id, meta);
   await db.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
   await auditGlobal({ action: 'user.login', resourceType: 'User', resourceId: user.id, userId: user.id, ip: meta.ip, userAgent: meta.userAgent });
@@ -153,6 +166,8 @@ export async function resetPasswordWithToken(input: { token: string; password: s
     db.session.updateMany({ where: { userId: row.userId, revokedAt: null }, data: { revokedAt: new Date() } }),
     db.passwordResetToken.updateMany({ where: { userId: row.userId, usedAt: null }, data: { usedAt: new Date() } }),
   ]);
+  const resetUser = await db.user.findUnique({ where: { id: row.userId }, select: { email: true } });
+  if (resetUser) await getInfra().redis.del(loginKey(resetUser.email));
   await auditGlobal({ action: 'user.password_reset', resourceType: 'User', resourceId: row.userId, userId: row.userId, ip: meta.ip, userAgent: meta.userAgent });
   return { ok: true };
 }

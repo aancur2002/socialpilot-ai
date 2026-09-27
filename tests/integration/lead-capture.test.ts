@@ -163,6 +163,25 @@ describe('lead capture', () => {
     expect((await inject(app, 'POST', '/api/v1/auth/login', { email: owner.email, password: 'brand-new-pass-1' })).status).toBe(200);
   });
 
+  it('locks an account after 10 wrong passwords, whatever the IP, and a reset unlocks it', async () => {
+    const victim = await createOwner('Lock');
+    for (let i = 0; i < 10; i++) {
+      expect((await inject(app, 'POST', '/api/v1/auth/login', { email: victim.email, password: `wrong-${i}-pass` }, { 'x-forwarded-for': `198.51.100.${i + 1}` })).status).toBe(401);
+    }
+    const locked = await inject(app, 'POST', '/api/v1/auth/login', { email: victim.email, password: 'password-1234' }, { 'x-forwarded-for': '198.51.100.99' });
+    expect(locked).toMatchObject({ status: 429, body: { error: { code: 'RATE_LIMITED' } } });
+    // Unknown emails get the same treatment, so the lock doesn't reveal which accounts exist.
+    const ghost = `ghost-${uid()}@test.local`;
+    for (let i = 0; i < 10; i++) await inject(app, 'POST', '/api/v1/auth/login', { email: ghost, password: 'nope-nope-1' }, { 'x-forwarded-for': `198.51.101.${i + 1}` });
+    expect((await inject(app, 'POST', '/api/v1/auth/login', { email: ghost, password: 'nope-nope-1' }, { 'x-forwarded-for': '198.51.101.99' })).status).toBe(429);
+
+    const user = await core.getInfra().db.user.findUniqueOrThrow({ where: { email: victim.email } });
+    const token = `unlock-${uid()}-${uid()}-${uid()}`;
+    await core.getInfra().db.passwordResetToken.create({ data: { userId: user.id, tokenHash: sha256(token), expiresAt: new Date(Date.now() + 60_000) } });
+    await core.resetPasswordWithToken({ token, password: 'fresh-password-9' }, {});
+    expect((await inject(app, 'POST', '/api/v1/auth/login', { email: victim.email, password: 'fresh-password-9' }, { 'x-forwarded-for': '198.51.100.100' })).status).toBe(200);
+  });
+
   it('stores platform secrets encrypted and never returns them', async () => {
     const saved = await core.adminUpdatePlatformGroup(superUser, 'email', { enabled: false, host: 'smtp.example.com', port: 587, user: 'mailer', password: 'super-secret-pass', fromEmail: 'hello@example.com' });
     expect(saved.password).toEqual({ set: true, hint: '…pass' });

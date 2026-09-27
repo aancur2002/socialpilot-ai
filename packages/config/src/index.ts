@@ -72,6 +72,9 @@ export const envSchema = z
     OPENAI_BASE_URL: optionalString,
 
     STORAGE_DRIVER: z.enum(['s3', 'local']).default('local'),
+    ALLOW_LOCAL_STORAGE: bool,
+    /** Directory for STORAGE_DRIVER=local; defaults to <repo>/.data/storage */
+    LOCAL_STORAGE_DIR: optionalString,
     S3_ENDPOINT: optionalString,
     S3_REGION: z.string().default('us-east-1'),
     S3_ACCESS_KEY: optionalString,
@@ -120,8 +123,10 @@ export const envSchema = z
     if (isProd && env.AI_PROVIDER === 'mock') {
       ctx.addIssue({ code: 'custom', path: ['AI_PROVIDER'], message: 'Mock AI provider is not allowed in production' });
     }
-    if (isProd && env.STORAGE_DRIVER === 'local') {
-      ctx.addIssue({ code: 'custom', path: ['STORAGE_DRIVER'], message: 'Local storage is not allowed in production' });
+    // Local disk storage suits a single server with a persistent volume; it must be chosen
+    // explicitly in production because it doesn't work with several API servers.
+    if (isProd && env.STORAGE_DRIVER === 'local' && !env.ALLOW_LOCAL_STORAGE) {
+      ctx.addIssue({ code: 'custom', path: ['STORAGE_DRIVER'], message: 'Local storage in production needs ALLOW_LOCAL_STORAGE=true (single server with a persistent volume), or use STORAGE_DRIVER=s3' });
     }
     if (env.AI_PROVIDER !== 'mock' && !env.AI_API_KEY) {
       ctx.addIssue({ code: 'custom', path: ['AI_API_KEY'], message: `AI_API_KEY is required for ${env.AI_PROVIDER}` });
