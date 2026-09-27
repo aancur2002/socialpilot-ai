@@ -10,6 +10,7 @@ export const QUEUE_NAMES = {
   notifications: 'notifications',
   maintenance: 'maintenance',
   contentGeneration: 'content-generation',
+  outbound: 'outbound',
 } as const;
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
 
@@ -22,6 +23,7 @@ export interface JobPayloads {
   notifications: { notificationId: string };
   maintenance: { task: 'refresh-tokens' | 'sweep-scheduled' | 'cleanup' };
   'content-generation': { contentId: string };
+  outbound: { webhookId: string; event: 'lead.created' | 'lead.updated' | 'lead.status_changed'; leadId: string };
 }
 
 export function createRedis(url: string, forWorker = false): Redis {

@@ -1,4 +1,6 @@
 import { canAssignRole, defaultClientAccess, generateToken, hashPassword, sha256, type RoleKey } from '@socialpilot/auth';
+import { sendEmail } from './email.service';
+import { getPlatformGroup } from './platform-settings.service';
 import { isUniqueViolation, type Plan, type Prisma } from '@socialpilot/database';
 import { buildAuthContext, requirePermission, type AuthContext } from '../context';
 import { AppError, badRequest, conflict, forbidden, notFound } from '../errors';
@@ -172,8 +174,20 @@ export async function inviteMember(ctx: AuthContext, input: { email: string; rol
   // Store intended client assignments on the invitation via audit trail; applied on acceptance.
   await audit(ctx, { action: 'member.invited', resourceType: 'Invitation', resourceId: invitation.id, after: { email: input.email, role: input.role, clientIds: input.clientIds ?? [] } });
   const acceptUrl = `${env.APP_URL}/invite?token=${encodeURIComponent(token)}`;
-  getInfra().logger.info({ organizationId: ctx.organizationId, invitationId: invitation.id }, 'invitation created (email delivery via EMAIL_DRIVER)');
-  return { invitation: { id: invitation.id, email: invitation.email, role: invitation.role, expiresAt: invitation.expiresAt }, acceptUrl, clientIds: input.clientIds ?? [] };
+  const [org, inviter, company] = await Promise.all([
+    db.organization.findUniqueOrThrow({ where: { id: ctx.organizationId }, select: { name: true } }),
+    db.user.findUniqueOrThrow({ where: { id: ctx.userId }, select: { name: true } }),
+    getPlatformGroup('company'),
+  ]);
+  const sent = await sendEmail({
+    to: input.email,
+    subject: `${inviter.name} invited you to ${org.name} on ${company.productName}`,
+    text: `${inviter.name} invited you to join ${org.name} on ${company.productName}.\n\nAccept the invitation: ${acceptUrl}\n\nThe link works once and expires in 7 days.`,
+  }).catch((error) => {
+    getInfra().logger.warn({ invitationId: invitation.id, error: error instanceof Error ? error.message : String(error) }, 'invitation email failed');
+    return { delivered: false };
+  });
+  return { invitation: { id: invitation.id, email: invitation.email, role: invitation.role, expiresAt: invitation.expiresAt }, acceptUrl, clientIds: input.clientIds ?? [], emailed: sent.delivered };
 }
 
 export async function acceptInvitation(input: { token: string; name?: string; password?: string }, sessionUser?: { id: string; email: string }) {

@@ -30,3 +30,8 @@ export * from './services/analytics.service';
 export * from './services/admin.service';
 export * from './services/platform-credentials.service';
 export * from './services/billing.service';
+export * from './services/platform-settings.service';
+export * from './services/email.service';
+export * from './services/lead-capture.service';
+export * from './services/stripe.service';
+export * from './services/legal.service';

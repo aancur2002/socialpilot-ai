@@ -380,6 +380,17 @@ model PlatformSetting {
   updatedAt DateTime @updatedAt
 }
 
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
 /// A payment recorded by the platform admin; extends the customer's paid-until date.
 model Payment {
   id             String       @id @default(cuid())
@@ -389,6 +400,10 @@ model Payment {
   method         String
   reference      String?
   note           String?
+  /// manual | stripe
+  provider       String       @default("manual")
+  /// The provider's payment id (e.g. Stripe checkout session), unique so a webhook retry can't record twice
+  providerRef    String?      @unique
   periodStart    DateTime
   periodEnd      DateTime
   recordedById   String?
@@ -540,6 +555,8 @@ model Client {
   leads            Lead[]
   knowledgeSources KnowledgeSource[]
   automationRules  AutomationRule[]
+  leadForms        LeadForm[]
+  leadApiKeys      LeadApiKey[]
   media            MediaAsset[]
 
   @@unique([organizationId, slug])
@@ -1098,12 +1115,28 @@ model Lead {
   status          LeadStatus @default(NEW)
   value           Float?
   assignedToId    String?
+  company         String?
+  /// What the person wrote (form message, first chat message)
+  message         String?
+  tags            String[]   @default([])
+  /// When someone should follow up; a reminder notification is sent when it's due
+  followUpAt      DateTime?
+  followUpNotifiedAt DateTime?
+  lostReason      String?
+  formId          String?
+  pageUrl         String?
+  utmSource       String?
+  utmMedium       String?
+  utmCampaign     String?
+  /// Extra answers from custom form fields, {"label": "answer"}
+  customFields    Json       @default("{}")
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
 
   client       Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
   contact      Contact?      @relation(fields: [contactId], references: [id], onDelete: SetNull)
   conversation Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  form         LeadForm?     @relation(fields: [formId], references: [id], onDelete: SetNull)
   notes        LeadNote[]
 
   @@index([organizationId])
@@ -1111,6 +1144,80 @@ model Lead {
   @@index([clientId, createdAt])
   @@index([conversationId])
   @@index([assignedToId])
+  @@index([followUpAt])
+  @@index([formId])
+}
+
+/// A lead capture form a client places on their website (embed or hosted page).
+model LeadForm {
+  id             String   @id @default(cuid())
+  organizationId String
+  clientId       String
+  name           String
+  /// Public identifier used in the embed code and hosted page URL
+  publicKey      String   @unique
+  title          String?
+  description    String?
+  /// [{ key, label, type: text|email|phone|textarea|select, required, options? }]
+  fields         Json
+  submitLabel    String   @default("Send")
+  successMessage String   @default("Thanks! We'll be in touch soon.")
+  redirectUrl    String?
+  /// Websites allowed to embed/submit (e.g. bellasbakery.com); empty = any
+  allowedDomains String[] @default([])
+  /// Extra people emailed about each new lead
+  notifyEmails   String[] @default([])
+  accentColor    String   @default("#0f766e")
+  active         Boolean  @default(true)
+  submissions    Int      @default(0)
+  createdById    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  leads  Lead[]
+
+  @@index([organizationId, clientId])
+}
+
+/// Lets another system (Zapier, Make, a website backend) send leads in.
+model LeadApiKey {
+  id             String    @id @default(cuid())
+  organizationId String
+  clientId       String
+  name           String
+  keyHash        String    @unique
+  /// First characters, shown so people can tell keys apart
+  prefix         String
+  lastUsedAt     DateTime?
+  revokedAt      DateTime?
+  createdById    String?
+  createdAt      DateTime  @default(now())
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, clientId])
+}
+
+/// Sends new and updated leads to another system (a CRM, Google Sheets via Zapier, ...).
+model LeadWebhook {
+  id             String    @id @default(cuid())
+  organizationId String
+  /// null = every client in the organization
+  clientId       String?
+  name           String
+  url            String
+  /// Used to sign each delivery (HMAC-SHA256), encrypted at rest
+  secretEnc      String
+  events         String[]  @default(["lead.created"])
+  active         Boolean   @default(true)
+  lastStatus     Int?
+  lastError      String?
+  lastDeliveredAt DateTime?
+  createdById    String?
+  createdAt      DateTime  @default(now())
+
+  @@index([organizationId])
 }
 
 model LeadNote {

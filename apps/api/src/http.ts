@@ -16,7 +16,7 @@ export const ORG_COOKIE = 'sp_org';
 export const ORG_HEADER = 'x-organization-id';
 
 /** Routes a blocked organization may still call: enough to show why and how to pay. */
-const BLOCKED_ALLOWED = new Set(['GET /organizations/current', 'GET /billing']);
+const BLOCKED_ALLOWED = new Set(['GET /organizations/current', 'GET /billing', 'POST /billing/checkout']);
 
 /** Parses input with zod; failures become a 422 with field-level issues. */
 export function parse<S extends z.ZodType>(schema: S, data: unknown): z.infer<S> {

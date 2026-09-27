@@ -243,7 +243,16 @@ export const createLeadSchema = z.object({
   value: z.number().nonnegative().max(1e12).optional().nullable(),
   assignedToId: idSchema.optional().nullable(),
 });
-export const updateLeadSchema = createLeadSchema.omit({ clientId: true, conversationId: true, contactId: true, source: true }).partial();
+export const updateLeadSchema = createLeadSchema
+  .omit({ clientId: true, conversationId: true, contactId: true, source: true })
+  .extend({
+    company: optionalText(200),
+    message: optionalText(5000),
+    tags: z.array(trimmed(40)).max(20).optional(),
+    followUpAt: z.coerce.date().optional().nullable(),
+    lostReason: optionalText(300),
+  })
+  .partial();
 export const leadNoteSchema = z.object({ body: trimmed(5000) });
 export const leadListQuerySchema = z.object({
   clientId: idSchema.optional(),
@@ -465,3 +474,79 @@ export const recordPaymentSchema = z.object({
 export const resetPasswordSchema = z.object({
   password: z.string().min(10, 'Use at least 10 characters').max(200).optional(),
 });
+
+// ── Lead capture: forms, API keys, webhooks ──────────────────────────
+const fieldKey = z.string().trim().min(1).max(40);
+export const leadFormFieldSchema = z.object({
+  key: fieldKey,
+  label: z.string().trim().min(1).max(80),
+  type: z.enum(['text', 'email', 'phone', 'textarea', 'select']),
+  required: z.boolean().default(false),
+  options: z.array(z.string().trim().min(1).max(80)).max(30).optional(),
+});
+const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Use a colour like #0f766e');
+export const createLeadFormSchema = z.object({
+  clientId: idSchema,
+  name: trimmed(80),
+  title: optionalText(120),
+  description: optionalText(500),
+  fields: z.array(leadFormFieldSchema).min(1).max(20),
+  submitLabel: trimmed(40).optional(),
+  successMessage: trimmed(300).optional(),
+  redirectUrl: z.url().max(500).nullable().optional().or(z.literal('').transform(() => null)),
+  allowedDomains: z.array(z.string().trim().min(3).max(200)).max(20).optional(),
+  notifyEmails: z.array(z.email().max(254)).max(10).optional(),
+  accentColor: hexColor.optional(),
+  active: z.boolean().optional(),
+});
+export const updateLeadFormSchema = createLeadFormSchema.omit({ clientId: true }).partial();
+export const createLeadApiKeySchema = z.object({ clientId: idSchema, name: trimmed(80) });
+const leadEvent = z.enum(['lead.created', 'lead.updated', 'lead.status_changed']);
+export const createLeadWebhookSchema = z.object({
+  name: trimmed(80),
+  url: z.url().max(500),
+  clientId: idSchema.nullable().optional(),
+  events: z.array(leadEvent).min(1).max(3).optional(),
+});
+export const updateLeadWebhookSchema = z.object({ name: trimmed(80).optional(), url: z.url().max(500).optional(), events: z.array(leadEvent).min(1).max(3).optional(), active: z.boolean().optional() });
+export const leadExportQuerySchema = z.object({ clientId: idSchema.optional(), status: leadStatusSchema.optional() });
+
+// ── Password reset ────────────────────────────────────────────────────
+export const forgotPasswordSchema = z.object({ email: z.email().max(254) });
+export const resetPasswordWithTokenSchema = z.object({ token: z.string().min(20).max(200), password: z.string().min(10, 'Use at least 10 characters').max(200) });
+
+// ── Platform settings (platform admins) ───────────────────────────────
+const nullableText = (max: number) => z.string().trim().max(max).nullable().optional().transform((v) => (v === '' ? null : v));
+export const companySettingsSchema = z.object({
+  productName: z.string().trim().min(1).max(60).optional(),
+  legalName: nullableText(200),
+  address: nullableText(500),
+  supportEmail: z.email().max(254).nullable().optional().or(z.literal('').transform(() => null)),
+  website: z.url().max(300).nullable().optional().or(z.literal('').transform(() => null)),
+  jurisdiction: nullableText(120),
+});
+export const legalSettingsSchema = z.object({
+  terms: nullableText(100_000),
+  privacy: nullableText(100_000),
+  updatedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+});
+export const emailSettingsSchema = z.object({
+  enabled: z.boolean().optional(),
+  host: nullableText(200),
+  port: z.number().int().min(1).max(65535).optional(),
+  secure: z.boolean().optional(),
+  user: nullableText(200),
+  /** undefined keeps the saved password, '' or null removes it */
+  password: z.string().max(500).nullable().optional(),
+  fromName: nullableText(100),
+  fromEmail: z.email().max(254).nullable().optional().or(z.literal('').transform(() => null)),
+});
+export const testEmailSchema = z.object({ to: z.email().max(254) });
+/** Keys only; switching card payments on goes through the key check. */
+export const stripeSettingsSchema = z.object({
+  publishableKey: z.string().trim().max(300).nullable().optional(),
+  secretKey: z.string().trim().max(300).nullable().optional(),
+  webhookSecret: z.string().trim().max(300).nullable().optional(),
+});
+export const stripeEnableSchema = z.object({ enabled: z.boolean() });
+export const checkoutSchema = z.object({ months: z.number().int().min(1).max(24).default(1) });

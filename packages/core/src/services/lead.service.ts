@@ -1,4 +1,5 @@
 import type { Intent, LeadStatus, Platform, Prisma } from '@socialpilot/database';
+import { emitLeadEvent } from './lead-capture.service';
 import { requirePermission, systemContext, tenantWhere, type AuthContext, type ServiceContext } from '../context';
 import { badRequest, notFound } from '../errors';
 import { getInfra } from '../infra';
@@ -72,14 +73,26 @@ export async function createLead(
   await assertAssignee(ctx.organizationId, input.assignedToId);
   const lead = await db.lead.create({ data: { ...input, email: input.email || null, organizationId: ctx.organizationId } });
   await audit(ctx, { action: 'lead.created', resourceType: 'Lead', resourceId: lead.id, clientId: input.clientId, after: { source: input.source, status: input.status } });
+  await emitLeadEvent(ctx.organizationId, input.clientId, 'lead.created', lead.id);
   return getLead(ctx, lead.id);
 }
 
-export async function updateLead(ctx: AuthContext, id: string, input: Partial<{ name: string | null; username: string | null; platform: Platform | null; email: string | null; phone: string | null; interest: string | null; intent: Intent | null; status: LeadStatus; value: number | null; assignedToId: string | null }>) {
+export async function updateLead(ctx: AuthContext, id: string, input: Partial<{ name: string | null; username: string | null; platform: Platform | null; email: string | null; phone: string | null; interest: string | null; intent: Intent | null; status: LeadStatus; value: number | null; assignedToId: string | null; company: string | null; message: string | null; tags: string[]; followUpAt: Date | null; lostReason: string | null }>) {
   requirePermission(ctx, 'leads:manage');
   const before = await getLead(ctx, id);
   await assertAssignee(ctx.organizationId, input.assignedToId);
-  await getInfra().db.lead.update({ where: { id }, data: { ...input, ...(input.email !== undefined ? { email: input.email || null } : {}) } });
+  await getInfra().db.lead.update({
+    where: { id },
+    data: {
+      ...input,
+      ...(input.email !== undefined ? { email: input.email?.toLowerCase() || null } : {}),
+      // A new follow-up date gets its own reminder.
+      ...(input.followUpAt !== undefined ? { followUpNotifiedAt: null } : {}),
+      ...(input.tags ? { tags: [...new Set(input.tags.map((t) => t.trim()).filter(Boolean))] } : {}),
+    },
+  });
+  const statusChanged = Boolean(input.status && input.status !== before.status);
+  await emitLeadEvent(ctx.organizationId, before.clientId, statusChanged ? 'lead.status_changed' : 'lead.updated', id);
   await audit(ctx, { action: input.status && input.status !== before.status ? 'lead.status_changed' : 'lead.updated', resourceType: 'Lead', resourceId: id, clientId: before.clientId, before: { status: before.status, assignedToId: before.assignedToId }, after: input });
   return getLead(ctx, id);
 }
@@ -113,6 +126,7 @@ export async function upsertDetectedLead(input: {
         confidence: Math.max(existing.confidence ?? 0, input.confidence),
       },
     });
+    await emitLeadEvent(input.organizationId, input.clientId, 'lead.updated', existing.id);
     return { leadId: existing.id, created: false };
   }
   const lead = await db.lead.create({
@@ -143,6 +157,7 @@ export async function upsertDetectedLead(input: {
     link: `/leads/${lead.id}`,
   });
   await runAutomationForEvent({ trigger: 'LEAD_CREATED', organizationId: input.organizationId, clientId: input.clientId, resourceType: 'Lead', resourceId: lead.id, facts: { intent: input.intent, confidence: input.confidence, platform: input.platform, leadDetected: true } });
+  await emitLeadEvent(input.organizationId, input.clientId, 'lead.created', lead.id);
   return { leadId: lead.id, created: true };
 }
 

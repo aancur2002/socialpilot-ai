@@ -192,6 +192,7 @@ export async function getBilling(ctx: AuthContext) {
     paidUntil: org.paidUntil,
     access: accessFor(org, settings, await priceFor(org)),
     paymentInstructions: settings.paymentInstructions,
+    cardPayments: await (await import('./stripe.service')).stripeEnabled(),
     limits: await getLimits(org.id),
     usage: await getUsage(org.id),
     payments,
@@ -360,26 +361,49 @@ export async function adminUpdateCustomer(
   return adminGetCustomer(user, id);
 }
 
-/** Records a payment and extends paid-until by the months paid for, from today or the current paid-until, whichever is later. */
-export async function adminRecordPayment(user: SuperUser, id: string, input: { amountCents: number; months: number; method: string; reference?: string | null; note?: string | null }) {
-  assertSuperAdmin(user);
+/**
+ * Records a payment and extends paid-until by the months paid for, from today or
+ * the current paid-until, whichever is later. A providerRef makes it idempotent
+ * (a Stripe webhook delivered twice records once).
+ */
+export async function recordPayment(
+  organizationId: string,
+  input: { amountCents: number; months: number; method: string; reference?: string | null; note?: string | null; currency?: string },
+  opts: { recordedById?: string | null; provider?: 'manual' | 'stripe'; providerRef?: string | null } = {},
+): Promise<{ recorded: boolean; paymentId?: string }> {
   const { db } = getInfra();
   const settings = await getPlatformSettings();
-  const payment = await db.$transaction(async (tx) => {
-    // Lock the row so two payments recorded at once both extend the period.
-    const rows = await tx.$queryRaw<{ paidUntil: Date | null }[]>`SELECT "paidUntil" FROM "Organization" WHERE id = ${id} FOR UPDATE`;
-    if (!rows.length) throw notFound('Customer');
-    const now = new Date();
-    const periodStart = rows[0]!.paidUntil && rows[0]!.paidUntil > now ? rows[0]!.paidUntil : now;
-    const periodEnd = new Date(periodStart);
-    periodEnd.setUTCMonth(periodEnd.getUTCMonth() + input.months);
-    await tx.organization.update({ where: { id }, data: { paidUntil: periodEnd, subscriptionStatus: 'ACTIVE' } });
-    return tx.payment.create({
-      data: { organizationId: id, amountCents: input.amountCents, currency: settings.currency, method: input.method, reference: input.reference ?? null, note: input.note ?? null, periodStart, periodEnd, recordedById: user.id },
+  if (opts.providerRef && (await db.payment.findUnique({ where: { providerRef: opts.providerRef } }))) return { recorded: false };
+  try {
+    const payment = await db.$transaction(async (tx) => {
+      // Lock the row so two payments recorded at once both extend the period.
+      const rows = await tx.$queryRaw<{ paidUntil: Date | null }[]>`SELECT "paidUntil" FROM "Organization" WHERE id = ${organizationId} FOR UPDATE`;
+      if (!rows.length) throw notFound('Customer');
+      const now = new Date();
+      const periodStart = rows[0]!.paidUntil && rows[0]!.paidUntil > now ? rows[0]!.paidUntil : now;
+      const periodEnd = new Date(periodStart);
+      periodEnd.setUTCMonth(periodEnd.getUTCMonth() + input.months);
+      await tx.organization.update({ where: { id: organizationId }, data: { paidUntil: periodEnd, subscriptionStatus: 'ACTIVE' } });
+      return tx.payment.create({
+        data: {
+          organizationId, amountCents: input.amountCents, currency: input.currency ?? settings.currency, method: input.method, reference: input.reference ?? null, note: input.note ?? null,
+          periodStart, periodEnd, recordedById: opts.recordedById ?? null, provider: opts.provider ?? 'manual', providerRef: opts.providerRef ?? null,
+        },
+      });
     });
-  });
-  clearAccessCache(id);
-  await auditGlobal({ action: 'platform.payment_recorded', resourceType: 'Payment', resourceId: payment.id, organizationId: id, userId: user.id, after: { amountCents: payment.amountCents, currency: payment.currency, method: payment.method, periodEnd: payment.periodEnd } });
+    clearAccessCache(organizationId);
+    await auditGlobal({ action: 'platform.payment_recorded', resourceType: 'Payment', resourceId: payment.id, organizationId, userId: opts.recordedById ?? null, after: { amountCents: payment.amountCents, currency: payment.currency, method: payment.method, provider: payment.provider, periodEnd: payment.periodEnd } });
+    return { recorded: true, paymentId: payment.id };
+  } catch (error) {
+    // A concurrent delivery of the same provider payment lost the race: already recorded.
+    if (opts.providerRef && isUniqueViolation(error)) return { recorded: false };
+    throw error;
+  }
+}
+
+export async function adminRecordPayment(user: SuperUser, id: string, input: { amountCents: number; months: number; method: string; reference?: string | null; note?: string | null }) {
+  assertSuperAdmin(user);
+  await recordPayment(id, input, { recordedById: user.id, provider: 'manual' });
   return adminGetCustomer(user, id);
 }
 

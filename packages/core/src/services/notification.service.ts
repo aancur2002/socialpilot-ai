@@ -1,4 +1,5 @@
 import { roleHasPermission, type Permission } from '@socialpilot/auth';
+import { sendEmail } from './email.service';
 import type { NotificationType, Prisma } from '@socialpilot/database';
 import type { AuthContext } from '../context';
 import { notFound } from '../errors';
@@ -75,18 +76,13 @@ export async function markNotificationsRead(ctx: AuthContext, ids: string[] | 'a
   return { updated: res.count };
 }
 
-/** Email delivery hook (worker). EMAIL_DRIVER=log writes the email to the log; smtp is pluggable. */
+/** Email delivery (worker): sends the notification by email when a mail server is configured. */
 export async function deliverNotificationEmail(notificationId: string): Promise<void> {
-  const { db, env, logger } = getInfra();
+  const { db, env } = getInfra();
   const n = await db.notification.findUnique({ where: { id: notificationId }, include: { user: { select: { email: true, name: true } } } });
   if (!n) throw notFound('Notification');
   if (n.emailStatus !== 'PENDING') return;
   const link = n.link ? `${env.APP_URL}${n.link}` : env.APP_URL;
-  if (env.EMAIL_DRIVER === 'log') {
-    logger.info({ to: n.user.email, subject: n.title, link, notificationId }, 'email (log driver)');
-  } else {
-    // SMTP delivery is intentionally not bundled; plug a transport here (e.g. nodemailer with SMTP_URL).
-    throw new Error('SMTP email driver is not implemented yet — set EMAIL_DRIVER=log');
-  }
+  await sendEmail({ to: n.user.email, subject: n.title, text: `Hi ${n.user.name},\n\n${n.body ? `${n.body}\n\n` : ''}Open it here: ${link}\n\nYou get these emails because of your notification settings.` });
   await db.notification.update({ where: { id: notificationId }, data: { emailStatus: 'SENT' } });
 }

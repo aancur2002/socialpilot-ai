@@ -1,5 +1,6 @@
 import {
   collectAccountAnalytics,
+  deliverLeadWebhook,
   deliverNotificationEmail,
   executePublish,
   getInfra,
@@ -7,6 +8,7 @@ import {
   processInboundMessage,
   processKnowledgeSource,
   processWebhookEvent,
+  sendDueFollowUpReminders,
   sendQueuedSuggestion,
   sweepDueScheduledPosts,
   TokenService,
@@ -69,7 +71,8 @@ export async function maintenanceProcessor(job: Job<JobPayloads['maintenance']>)
   const social = await getSocial();
   switch (job.data.task) {
     case 'sweep-scheduled':
-      return { enqueued: await sweepDueScheduledPosts() };
+      // Runs every 5 minutes: due posts, and follow-up reminders for leads.
+      return { enqueued: await sweepDueScheduledPosts(), ...(await sendDueFollowUpReminders()) };
     case 'refresh-tokens': {
       // Refresh tokens expiring within 24 hours for platforms that support refresh.
       const soon = new Date(Date.now() + 24 * 3600 * 1000);
@@ -96,7 +99,13 @@ export async function maintenanceProcessor(job: Job<JobPayloads['maintenance']>)
         db.session.deleteMany({ where: { OR: [{ expiresAt: { lt: new Date() } }, { revokedAt: { lt: new Date(Date.now() - 7 * 86_400_000) } }] } }),
         db.oAuthState.deleteMany({ where: { expiresAt: { lt: new Date(Date.now() - 86_400_000) } } }),
       ]);
-      return { sessions: sessions.count, oauthStates: states.count };
+      const resets = await db.passwordResetToken.deleteMany({ where: { expiresAt: { lt: new Date(Date.now() - 86_400_000) } } });
+      return { sessions: sessions.count, oauthStates: states.count, passwordResets: resets.count };
     }
   }
+}
+
+/** Outgoing lead webhooks; failures throw so BullMQ retries with backoff. */
+export async function outboundProcessor(job: Job<JobPayloads['outbound']>) {
+  return deliverLeadWebhook(job.data.webhookId, job.data.event, job.data.leadId);
 }

@@ -9,6 +9,7 @@ import {
   notificationProcessor,
   publishProcessor,
   webhookProcessor,
+  outboundProcessor,
 } from './processors';
 
 const env = getEnv();
@@ -23,6 +24,7 @@ const definitions: { name: QueueName; processor: Processor; concurrency: number 
   { name: QUEUE_NAMES.analytics, processor: analyticsProcessor as Processor, concurrency: 2 },
   { name: QUEUE_NAMES.notifications, processor: notificationProcessor as Processor, concurrency: 5 },
   { name: QUEUE_NAMES.maintenance, processor: maintenanceProcessor as Processor, concurrency: 1 },
+  { name: QUEUE_NAMES.outbound, processor: outboundProcessor as Processor, concurrency: 5 },
 ];
 
 const workers = definitions.map(({ name, processor, concurrency }) => {

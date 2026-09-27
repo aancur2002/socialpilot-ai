@@ -5,7 +5,9 @@ import { AppError, conflict, forbidden } from '../errors';
 import { publicSignupSettings } from './billing.service';
 import { getInfra } from '../infra';
 import { auditGlobal } from './audit.service';
+import { sendEmail } from './email.service';
 import { createOrganizationForUser } from './organization.service';
+import { getPlatformGroup } from './platform-settings.service';
 
 export interface SessionResult {
   token: string;
@@ -105,4 +107,52 @@ export async function changePassword(userId: string, currentSessionId: string, i
   const revoked = await db.session.updateMany({ where: { userId, revokedAt: null, id: { not: currentSessionId } }, data: { revokedAt: new Date() } });
   await auditGlobal({ action: 'user.password_changed', resourceType: 'User', resourceId: userId, userId, ip: meta.ip, userAgent: meta.userAgent, after: { otherSessionsSignedOut: revoked.count } });
   return { otherSessionsSignedOut: revoked.count };
+}
+
+// ── Forgot password ───────────────────────────────────────────────────
+
+const RESET_TTL_MS = 60 * 60 * 1000;
+
+/**
+ * Emails a one-time reset link. Always succeeds from the caller's point of view,
+ * so the form can't be used to find out which emails have accounts.
+ */
+export async function requestPasswordReset(email: string, meta: { ip?: string; userAgent?: string }) {
+  const { db, env, redis } = getInfra();
+  const normalized = email.trim().toLowerCase();
+  // At most 3 emails per address per hour.
+  const key = `socialpilot:rl:pwreset:${sha256(normalized)}`;
+  const n = await redis.incr(key);
+  if (n === 1) await redis.expire(key, 3600);
+  if (n > 3) return { ok: true };
+  const user = await db.user.findUnique({ where: { email: normalized }, select: { id: true, name: true, disabledAt: true } });
+  if (!user || user.disabledAt) return { ok: true };
+  const token = generateToken(32);
+  await db.passwordResetToken.create({ data: { userId: user.id, tokenHash: sha256(token), expiresAt: new Date(Date.now() + RESET_TTL_MS) } });
+  const company = await getPlatformGroup('company');
+  const link = `${env.APP_URL}/reset-password?token=${encodeURIComponent(token)}`;
+  await sendEmail({
+    to: normalized,
+    subject: `Reset your ${company.productName} password`,
+    text: `Hi ${user.name},\n\nSomeone asked to reset your ${company.productName} password. If it was you, choose a new one here:\n${link}\n\nThe link works once and expires in 1 hour. If you didn't ask for this, ignore this email; your password stays the same.`,
+  }).catch((error) => getInfra().logger.warn({ userId: user.id, error: error instanceof Error ? error.message : String(error) }, 'password reset email failed'));
+  await auditGlobal({ action: 'user.password_reset_requested', resourceType: 'User', resourceId: user.id, userId: user.id, ip: meta.ip, userAgent: meta.userAgent });
+  return { ok: true };
+}
+
+/** Sets the new password from a reset link and signs the user out everywhere. */
+export async function resetPasswordWithToken(input: { token: string; password: string }, meta: { ip?: string; userAgent?: string }) {
+  const { db } = getInfra();
+  const row = await db.passwordResetToken.findUnique({ where: { tokenHash: sha256(input.token) } });
+  if (!row || row.usedAt || row.expiresAt < new Date()) throw new AppError('BAD_REQUEST', 'This reset link is invalid or has expired. Ask for a new one.');
+  // Claim the token first so a double submit can't use it twice.
+  const claimed = await db.passwordResetToken.updateMany({ where: { id: row.id, usedAt: null }, data: { usedAt: new Date() } });
+  if (claimed.count !== 1) throw new AppError('BAD_REQUEST', 'This reset link was already used.');
+  await db.$transaction([
+    db.user.update({ where: { id: row.userId }, data: { passwordHash: await hashPassword(input.password) } }),
+    db.session.updateMany({ where: { userId: row.userId, revokedAt: null }, data: { revokedAt: new Date() } }),
+    db.passwordResetToken.updateMany({ where: { userId: row.userId, usedAt: null }, data: { usedAt: new Date() } }),
+  ]);
+  await auditGlobal({ action: 'user.password_reset', resourceType: 'User', resourceId: row.userId, userId: row.userId, ip: meta.ip, userAgent: meta.userAgent });
+  return { ok: true };
 }

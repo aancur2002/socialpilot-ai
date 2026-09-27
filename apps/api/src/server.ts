@@ -40,10 +40,16 @@ export async function buildServer(): Promise<FastifyInstance> {
     }
   });
 
+  const PUBLIC_PREFIX = '/api/v1/public/';
   const allowedOrigins = new Set([env.APP_URL, ...env.CORS_ORIGINS.split(',').map((o) => o.trim()).filter(Boolean)]);
 
   await app.register(helmet, { contentSecurityPolicy: false, crossOriginResourcePolicy: { policy: 'cross-origin' } });
-  await app.register(cors, { origin: (origin, cb) => cb(null, !origin || allowedOrigins.has(origin)), credentials: true });
+  // Public lead endpoints (embedded forms, lead API) are called from customers' own websites:
+  // any origin, never with cookies. Everything else: our app only, with cookies.
+  await app.register(cors, () => (req: { url?: string }, cb: (err: Error | null, options: Record<string, unknown>) => void) => {
+    if (req.url?.startsWith(PUBLIC_PREFIX)) return cb(null, { origin: '*', credentials: false, methods: ['GET', 'POST', 'OPTIONS'], allowedHeaders: ['content-type', 'authorization'] });
+    cb(null, { origin: (origin: string | undefined, done: (e: Error | null, ok: boolean) => void) => done(null, !origin || allowedOrigins.has(origin)), credentials: true });
+  });
   await app.register(cookie, { secret: env.JWT_SECRET });
   await app.register(multipart, { limits: { fileSize: MAX_UPLOAD_BYTES, files: 1, fields: 10 } });
   await app.register(rateLimit, {
@@ -78,6 +84,8 @@ export async function buildServer(): Promise<FastifyInstance> {
   app.addHook('preHandler', async (req) => {
     if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return;
     if (req.url.startsWith('/webhooks/')) return;
+    // Public endpoints authenticate with a form key or API key, never the session cookie.
+    if (req.url.startsWith(PUBLIC_PREFIX)) return;
     if (!req.cookies[SESSION_COOKIE]) return;
     const origin = req.headers.origin ?? (req.headers.referer ? new URL(req.headers.referer).origin : undefined);
     const self = `${req.protocol}://${req.headers.host}`;

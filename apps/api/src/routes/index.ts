@@ -3,6 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import { authRoutes } from './auth';
 import { contentRoutes, localMediaRoutes } from './content';
 import { adminRoutes, aiSettingsRoutes, analyticsRoutes, automationRoutes, crmRoutes, inboxRoutes, knowledgeRoutes } from './engagement';
+import { leadCaptureRoutes, passwordResetRoutes, platformSettingsRoutes, stripeWebhookRoutes } from './leads';
 import { organizationRoutes } from './organization';
 import { socialRoutes, webhookRoutes } from './social';
 
@@ -24,6 +25,7 @@ export async function registerRoutes(app: FastifyInstance) {
   });
 
   await app.register(webhookRoutes);
+  await app.register(stripeWebhookRoutes);
   await app.register(localMediaRoutes);
   await app.register(
     async (v1) => {
@@ -38,6 +40,9 @@ export async function registerRoutes(app: FastifyInstance) {
       await v1.register(analyticsRoutes);
       await v1.register(aiSettingsRoutes);
       await v1.register(adminRoutes);
+      await v1.register(leadCaptureRoutes);
+      await v1.register(passwordResetRoutes);
+      await v1.register(platformSettingsRoutes);
     },
     { prefix: '/api/v1' },
   );
