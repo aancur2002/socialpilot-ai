@@ -161,20 +161,27 @@ function build(r: Resolved): { ai: AIProvider; embeddings: EmbeddingProvider } {
   return { ai, embeddings: createEmbeddingProvider(config) };
 }
 
-const cache = new Map<string, { expires: number; value: { ai: AIProvider; embeddings: EmbeddingProvider } }>();
+const cache = new Map<string, { expires: number; version: number | null; value: { ai: AIProvider; embeddings: EmbeddingProvider } }>();
 const TTL_MS = 30_000;
 
 /**
  * The AI and embedding providers for an organization: its own settings from
- * Settings → AI models, falling back to the server defaults. Cached briefly;
- * saving settings clears the cache in this process, other processes pick the
- * change up within 30 seconds.
+ * Settings → AI models, falling back to the server defaults. Rechecked every 30
+ * seconds and rebuilt only when the settings changed; saving settings clears the
+ * cache in this process, other processes pick the change up within 30 seconds.
  */
 export async function aiFor(organizationId: string): Promise<{ ai: AIProvider; embeddings: EmbeddingProvider }> {
   const hit = cache.get(organizationId);
   if (hit && hit.expires > Date.now()) return hit.value;
   const { db, ai, embeddings, logger } = getInfra();
   const row = await db.organizationAiSettings.findUnique({ where: { organizationId } });
+  const version = row?.updatedAt.getTime() ?? null;
+  // Unchanged settings keep the same providers, so failover cooldowns (a provider
+  // skipped after a billing or rate-limit error) survive the refresh.
+  if (hit && hit.version === version) {
+    hit.expires = Date.now() + TTL_MS;
+    return hit.value;
+  }
   let value = { ai, embeddings };
   if (row) {
     try {
@@ -185,7 +192,7 @@ export async function aiFor(organizationId: string): Promise<{ ai: AIProvider; e
       logger.warn({ organizationId, error: error instanceof Error ? error.message : String(error) }, 'organization AI settings unusable; using server defaults');
     }
   }
-  cache.set(organizationId, { expires: Date.now() + TTL_MS, value });
+  cache.set(organizationId, { expires: Date.now() + TTL_MS, version, value });
   return value;
 }
 
