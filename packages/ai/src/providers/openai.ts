@@ -76,7 +76,7 @@ export const COMPATIBLE_PRESETS: Record<CompatibleProvider, Preset> = {
     embeddingInputType: true,
   },
   meta: {
-    label: 'Meta Model API',
+    label: 'Meta Model',
     baseUrl: 'https://api.meta.ai/v1',
     model: 'muse-spark-1.3',
     fastModel: 'muse-spark-1.3',
@@ -149,7 +149,7 @@ async function compatibleFetchOnce<T>(fetchImpl: FetchImpl, label: string, baseU
     } catch {
       detail = '';
     }
-    const kind = res.status === 429 ? 'rate_limit' : res.status === 401 || res.status === 403 ? 'auth' : res.status >= 500 ? 'server' : 'invalid_request';
+    const kind = res.status === 429 ? 'rate_limit' : res.status === 401 || res.status === 402 || res.status === 403 ? 'auth' : res.status >= 500 ? 'server' : 'invalid_request';
     throw new AiProviderError(`${label} API returned HTTP ${res.status}${detail}`, res.status === 429 || res.status >= 500, kind);
   }
   return (await res.json()) as T;

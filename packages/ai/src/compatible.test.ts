@@ -129,6 +129,14 @@ describe('OpenAI-compatible providers', () => {
     await expect(new OpenAIProvider({ apiKey: 'k', kind: 'meta', fetchImpl: badKey.impl }).listModels()).rejects.toThrow(/401/);
   });
 
+  it('treats a billing error (HTTP 402) as an account problem, so failover rests that provider', async () => {
+    const { impl } = fakeFetch([{ status: 402, body: { error: { message: 'Billing verification failed.' } } }]);
+    await expect(new OpenAIProvider({ apiKey: 'k', kind: 'meta', fetchImpl: impl }).generateText({ system: 's', messages: [{ role: 'user', content: 'x' }] })).rejects.toMatchObject({
+      kind: 'auth',
+      message: 'Meta Model API returned HTTP 402: Billing verification failed.',
+    });
+  });
+
   it('does not send reasoning_effort to providers that do not take it', async () => {
     const { impl, calls } = fakeFetch([completion('ok')]);
     await new OpenAIProvider({ apiKey: 'k', kind: 'google', fetchImpl: impl }).generateText({ system: 's', messages: [{ role: 'user', content: 'x' }] });
