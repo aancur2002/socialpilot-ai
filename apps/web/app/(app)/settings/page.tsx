@@ -3,9 +3,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ROLE_KEYS } from '@socialpilot/validation';
 import { Plus } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { ago, humanize, when } from '@/components/domain';
+import { BillingPanel } from '@/components/billing';
 import { ClientMultiSelect } from '@/components/client-select';
 import { AccountSettings } from '@/components/settings-account';
 import { AiModelSettings } from '@/components/settings-ai';
@@ -177,14 +178,20 @@ function AuditLog() {
 export default function SettingsPage() {
   const { org, can } = useSession();
   const qc = useQueryClient();
-  const [tab, setTab] = useState<'general' | 'account' | 'ai' | 'team' | 'audit'>('general');
+  type Tab = 'general' | 'account' | 'ai' | 'team' | 'billing' | 'audit';
+  const [tab, setTab] = useState<Tab>('general');
+  useEffect(() => {
+    // Deep links such as /settings?tab=billing from the payment reminder.
+    const wanted = new URLSearchParams(window.location.search).get('tab');
+    if (wanted && ['general', 'account', 'ai', 'team', 'billing', 'audit'].includes(wanted)) setTab(wanted as Tab);
+  }, []);
   const [name, setName] = useState(org.name);
   const save = useMutation({ mutationFn: () => api('/organizations/current', { method: 'PATCH', body: { name } }), onSuccess: () => { toast.success('Saved'); qc.invalidateQueries({ queryKey: ['org'] }); }, onError: (e) => toast.error(errorMessage(e)) });
   const usageRows: [string, string][] = [['clients', 'Clients'], ['socialAccounts', 'Social accounts'], ['members', 'Team members'], ['aiGenerations', 'AI generations this month'], ['posts', 'Posts this month'], ['messages', 'Messages this month']];
   return (
     <>
       <PageHeader title="Settings" description={`${org.name}, ${humanize(org.plan)} plan. Your role: ${humanize(org.role)}.`} />
-      <div className="mb-4"><Tabs value={tab} onChange={setTab} items={[{ value: 'general', label: 'General' }, { value: 'account', label: 'Your account' }, ...(can('settings:manage') ? [{ value: 'ai' as const, label: 'AI models' }] : []), ...(can('users:view') ? [{ value: 'team' as const, label: 'Team' }] : []), ...(can('audit:view') ? [{ value: 'audit' as const, label: 'Audit log' }] : [])]} /></div>
+      <div className="mb-4"><Tabs value={tab} onChange={setTab} items={[{ value: 'general', label: 'General' }, { value: 'account', label: 'Your account' }, ...(can('settings:manage') ? [{ value: 'ai' as const, label: 'AI models' }] : []), ...(can('users:view') ? [{ value: 'team' as const, label: 'Team' }] : []), ...(can('settings:manage') ? [{ value: 'billing' as const, label: 'Billing' }] : []), ...(can('audit:view') ? [{ value: 'audit' as const, label: 'Audit log' }] : [])]} /></div>
       {tab === 'general' && (
         <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
           <Panel>
@@ -212,6 +219,7 @@ export default function SettingsPage() {
       {tab === 'account' && <AccountSettings />}
       {tab === 'ai' && <AiModelSettings />}
       {tab === 'team' && <Members />}
+      {tab === 'billing' && <BillingPanel />}
       {tab === 'audit' && <AuditLog />}
     </>
   );

@@ -1,7 +1,8 @@
 import { DUMMY_PASSWORD_HASH, generateToken, hashPassword, sha256, verifyPassword } from '@socialpilot/auth';
 import { isUniqueViolation } from '@socialpilot/database';
 import type { LoginInput, RegisterInput } from '@socialpilot/validation';
-import { AppError, conflict } from '../errors';
+import { AppError, conflict, forbidden } from '../errors';
+import { publicSignupSettings } from './billing.service';
 import { getInfra } from '../infra';
 import { auditGlobal } from './audit.service';
 import { createOrganizationForUser } from './organization.service';
@@ -22,6 +23,7 @@ async function createSession(userId: string, meta: { ip?: string; userAgent?: st
 
 export async function register(input: RegisterInput, meta: { ip?: string; userAgent?: string }): Promise<SessionResult & { organizationId?: string }> {
   const { db } = getInfra();
+  if (!(await publicSignupSettings()).allowPublicSignup) throw forbidden('Sign-up is closed. Ask your provider for an account.');
   const passwordHash = await hashPassword(input.password);
   let user;
   try {

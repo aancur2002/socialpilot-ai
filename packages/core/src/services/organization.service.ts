@@ -18,8 +18,11 @@ export const PLAN_LIMITS: Record<Plan, Record<LimitKey, number>> = {
 };
 
 export async function getLimits(organizationId: string): Promise<Record<LimitKey, number>> {
-  const org = await getInfra().db.organization.findUniqueOrThrow({ where: { id: organizationId }, select: { plan: true, limits: true } });
-  return { ...PLAN_LIMITS[org.plan], ...((org.limits ?? {}) as Partial<Record<LimitKey, number>>) };
+  const { db } = getInfra();
+  const org = await db.organization.findUniqueOrThrow({ where: { id: organizationId }, select: { plan: true, limits: true } });
+  // Built-in plan limits ← limits the platform admin set for the plan ← this customer's overrides.
+  const planRow = await db.planPrice.findUnique({ where: { plan: org.plan }, select: { limits: true } });
+  return { ...PLAN_LIMITS[org.plan], ...((planRow?.limits ?? {}) as Partial<Record<LimitKey, number>>), ...((org.limits ?? {}) as Partial<Record<LimitKey, number>>) };
 }
 
 /** Throws PLAN_LIMIT when adding `increment` would exceed the organization's plan. */

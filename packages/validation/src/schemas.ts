@@ -399,3 +399,69 @@ export const platformSetupSchema = z.object({
   configId: z.string().trim().min(2).max(200).nullable().optional(),
   organizationScopes: z.boolean().optional(),
 });
+
+// ── SaaS billing (platform admins) ─────────────────────────────────────
+export const PLAN_KEYS = ['FREE', 'STARTER', 'PRO', 'AGENCY', 'ENTERPRISE'] as const;
+export const LIMIT_KEYS = ['clients', 'socialAccounts', 'members', 'aiGenerations', 'posts', 'messages', 'storageMb'] as const;
+const cents = z.number().int().min(0).max(100_000_000);
+const limitsSchema = z.partialRecord(z.enum(LIMIT_KEYS), z.number().int().min(0).max(100_000_000));
+const optionalDate = z.coerce.date().nullable().optional();
+
+export const platformSettingsSchema = z.object({
+  currency: z.string().trim().length(3).toUpperCase().optional(),
+  graceDays: z.number().int().min(0).max(90).optional(),
+  trialDays: z.number().int().min(0).max(365).optional(),
+  allowPublicSignup: z.boolean().optional(),
+  paymentInstructions: z.string().trim().max(2000).nullable().optional(),
+});
+
+export const planPriceSchema = z.object({
+  name: z.string().trim().min(1).max(60).optional(),
+  description: z.string().trim().max(300).nullable().optional(),
+  priceCents: cents.optional(),
+  limits: limitsSchema.optional(),
+  public: z.boolean().optional(),
+});
+
+export const createCustomerSchema = z.object({
+  organizationName: z.string().trim().min(2).max(120),
+  plan: z.enum(PLAN_KEYS),
+  billingMode: z.enum(['MANUAL', 'COMPLIMENTARY']).default('MANUAL'),
+  customPriceCents: cents.nullable().optional(),
+  /** Days of free trial; omitted = platform default, 0 = no trial (paid from today) */
+  trialDays: z.number().int().min(0).max(365).optional(),
+  billingEmail: z.email().max(200).nullable().optional(),
+  owner: z.object({
+    name: z.string().trim().min(1).max(120),
+    email: z.email().max(200).transform((e) => e.toLowerCase()),
+    /** Omitted = a strong password is generated and shown once */
+    password: z.string().min(10, 'Use at least 10 characters').max(200).optional(),
+  }),
+});
+
+export const updateCustomerSchema = z.object({
+  name: z.string().trim().min(2).max(120).optional(),
+  plan: z.enum(PLAN_KEYS).optional(),
+  billingMode: z.enum(['MANUAL', 'COMPLIMENTARY']).optional(),
+  customPriceCents: cents.nullable().optional(),
+  billingEmail: z.email().max(200).nullable().optional(),
+  billingNotes: z.string().trim().max(2000).nullable().optional(),
+  trialEndsAt: optionalDate,
+  paidUntil: optionalDate,
+  subscriptionStatus: z.enum(['TRIALING', 'ACTIVE', 'PAST_DUE', 'CANCELED', 'NONE']).optional(),
+  suspended: z.boolean().optional(),
+  suspendReason: z.string().trim().max(300).nullable().optional(),
+  limits: limitsSchema.optional(),
+});
+
+export const recordPaymentSchema = z.object({
+  amountCents: cents,
+  months: z.number().int().min(1).max(36).default(1),
+  method: z.enum(['bank_transfer', 'cash', 'card', 'upi', 'paypal', 'other']),
+  reference: z.string().trim().max(200).nullable().optional(),
+  note: z.string().trim().max(500).nullable().optional(),
+});
+
+export const resetPasswordSchema = z.object({
+  password: z.string().min(10, 'Use at least 10 characters').max(200).optional(),
+});

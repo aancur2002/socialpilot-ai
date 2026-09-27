@@ -50,6 +50,13 @@ enum SubscriptionStatus {
   NONE
 }
 
+/// MANUAL: the platform admin records payments (bank transfer, cash, card elsewhere).
+/// COMPLIMENTARY: free of charge, never blocked for payment.
+enum BillingMode {
+  MANUAL
+  COMPLIMENTARY
+}
+
 enum Platform {
   FACEBOOK
   INSTAGRAM
@@ -331,6 +338,16 @@ model Organization {
   /// Plan limits override, e.g. {"clients":5,"socialAccounts":20,"aiGenerations":1000}
   limits             Json               @default("{}")
   onboardingStep     String?
+  billingMode        BillingMode        @default(MANUAL)
+  /// Overrides the plan's price for this customer (smallest currency unit, e.g. cents)
+  customPriceCents   Int?
+  billingEmail       String?
+  billingNotes       String?
+  trialEndsAt        DateTime?
+  /// Service is paid up to this moment; access continues for the grace period after it
+  paidUntil          DateTime?
+  suspendedAt        DateTime?
+  suspendReason      String?
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
 
@@ -339,6 +356,47 @@ model Organization {
   aiSettings  OrganizationAiSettings?
   clients     Client[]
   usage       UsageCounter[]
+  payments    Payment[]
+}
+
+/// Price and limits of each plan, set by the platform admin.
+model PlanPrice {
+  plan        Plan     @id
+  name        String
+  description String?
+  /// Monthly price in the smallest currency unit (e.g. cents)
+  priceCents  Int      @default(0)
+  /// Overrides the built-in limits for this plan, e.g. {"clients":5}
+  limits      Json     @default("{}")
+  /// Hidden plans can still be assigned by the admin but aren't offered to new customers
+  public      Boolean  @default(true)
+  updatedAt   DateTime @updatedAt
+}
+
+/// Platform-wide settings (single rows keyed by name), e.g. billing currency, public sign-up.
+model PlatformSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}
+
+/// A payment recorded by the platform admin; extends the customer's paid-until date.
+model Payment {
+  id             String       @id @default(cuid())
+  organizationId String
+  amountCents    Int
+  currency       String
+  method         String
+  reference      String?
+  note           String?
+  periodStart    DateTime
+  periodEnd      DateTime
+  recordedById   String?
+  createdAt      DateTime     @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
 }
 
 model OrganizationMember {

@@ -202,7 +202,26 @@ Invite people, change roles, choose which clients each person can access (**Chan
 ### 5.5 Audit log (Settings → Audit log)
 Who did what and when: posts, approvals, messages sent, AI replies, settings changes, account connections and permission changes.
 
-## 6. Going live with real social accounts
+## 6. Running it as a SaaS: customers, plans and billing
+
+Every customer is a separate organization: their own users, clients, posts, inbox and AI settings, invisible to other customers. You run it all from **Platform admin** (sign in as a platform admin).
+
+**Set your prices once** in **Platform admin → Plans & billing**:
+- **Billing settings:** currency, default free trial (days), grace period (days of access after a payment is due), and **How customers pay you** (bank details or a payment link, shown on each customer's billing page).
+- **Public sign-up:** on = anyone can create a Free account; off = only you create accounts, and the sign-up page says so.
+- **Plans:** name, monthly price and limits (clients, social accounts, team members, AI generations, posts, messages) for Free, Starter, Pro, Agency and Enterprise.
+
+**Add a customer** in **Platform admin → Customers → New customer**: business name, plan, paid or complimentary, optional custom price, trial days, and the owner's name, email and password (leave it empty to generate one). The next screen shows the login details **once**, with a **Copy details** button to send to the customer. The owner then invites their own team in **Settings → Team**.
+
+**Get paid:** payments happen outside the app (bank transfer, cash, UPI, a payment link). When money arrives, open the customer (**Manage**) and **Record payment**: amount, months, method and reference. Paid-until moves forward by those months, counted from today or from the current paid-until if it's still in the future.
+
+**What customers see:** **Settings → Billing** shows their plan, price, paid-until, usage against limits and payment history. Owners get a red strip at the top when payment is due or a trial ends within 5 days.
+
+**When access stops:** a customer is paused when their trial ends unpaid, their payment is overdue beyond the grace period, you cancel them, or you **Suspend** them (with a reason they'll see). Paused users can only see why and their billing page. Their scheduled posts wait instead of failing, incoming messages are still saved, and no AI replies are drafted, so no AI credits are spent. **Restore access** or record a payment and everything resumes within about 15 seconds. Free-plan and complimentary customers are never paused for payment.
+
+**Password help:** **Manage → Users → Reset password** generates a new password, signs that user out everywhere, and shows the new password once.
+
+## 7. Going live with real social accounts
 
 Real connections need a developer app on each platform. You create these once, as the operator of this service, and every agency connects through them.
 
@@ -219,7 +238,7 @@ Real connections need a developer app on each platform. You create these once, a
 
 Also for production: use real AI keys (5.2), S3 storage with a public URL for media (`STORAGE_DRIVER=s3` and the `S3_*` settings), and `NODE_ENV=production`. See `docs/deployment.md`.
 
-## 7. Testing
+## 8. Testing
 
 **Automated tests**
 ```bash
@@ -243,7 +262,7 @@ npm run test:e2e            # browser tests; needs `npm run dev` running and dem
 4. **Knowledge base**: open the FAQ, add a sentence, save, and ask it in **Test a question**.
 5. Sign in as `viewer@demo.local` and confirm you can look but not create or change anything.
 
-## 8. Developing
+## 9. Developing
 
 | To change… | Look in |
 |---|---|
@@ -268,7 +287,7 @@ Don't run `npx prisma migrate dev` directly. It mistakes the knowledge-search in
 
 **Useful references**: `docs/architecture.md` (how the parts fit together), `docs/ai.md` (AI behaviour and safety), `docs/security.md`, `docs/database.md`, and `TODO.md` (planned work).
 
-## 9. Common problems
+## 10. Common problems
 
 | Problem | Fix |
 |---|---|

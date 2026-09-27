@@ -1,4 +1,4 @@
-import { AppError, resolveAuthContext, type AuthContext, type SessionUser } from '@socialpilot/core';
+import { AppError, assertOrganizationAccess, resolveAuthContext, type AuthContext, type SessionUser } from '@socialpilot/core';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
@@ -14,6 +14,9 @@ declare module 'fastify' {
 export const SESSION_COOKIE = 'sp_session';
 export const ORG_COOKIE = 'sp_org';
 export const ORG_HEADER = 'x-organization-id';
+
+/** Routes a blocked organization may still call: enough to show why and how to pay. */
+const BLOCKED_ALLOWED = new Set(['GET /organizations/current', 'GET /billing']);
 
 /** Parses input with zod; failures become a 422 with field-level issues. */
 export function parse<S extends z.ZodType>(schema: S, data: unknown): z.infer<S> {
@@ -44,8 +47,12 @@ export async function requireCtx(req: FastifyRequest): Promise<AuthContext> {
   const header = req.headers[ORG_HEADER];
   const orgId = (Array.isArray(header) ? header[0] : header) ?? req.cookies[ORG_COOKIE];
   if (!orgId || !/^[a-zA-Z0-9_-]{1,64}$/.test(orgId)) throw new AppError('BAD_REQUEST', 'Select an organization (X-Organization-Id header)');
-  req.authCtx = await resolveAuthContext(user, orgId, { requestId: req.id, ip: req.ip, userAgent: req.headers['user-agent'] });
-  return req.authCtx;
+  const ctx = await resolveAuthContext(user, orgId, { requestId: req.id, ip: req.ip, userAgent: req.headers['user-agent'] });
+  // A blocked (unpaid or suspended) organization can still load itself and its billing page.
+  const route = (req.routeOptions.url ?? '').replace(/^\/api\/v\d+/, '');
+  if (!BLOCKED_ALLOWED.has(`${req.method} ${route}`)) await assertOrganizationAccess(orgId);
+  req.authCtx = ctx;
+  return ctx;
 }
 
 export const idParam = z.object({ id: z.string().min(1).max(64).regex(/^[a-zA-Z0-9_-]+$/) });

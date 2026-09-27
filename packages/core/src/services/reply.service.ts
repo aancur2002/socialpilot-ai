@@ -13,6 +13,7 @@ import {
   type IntentOutput,
   type ReplyOutput,
 } from '@socialpilot/ai';
+import { organizationAccess } from './billing.service';
 import type { Intent, Prisma, ReplyDecision } from '@socialpilot/database';
 import { getPlatformCapabilities } from '@socialpilot/social';
 import type { AutomationAction, IntentKey } from '@socialpilot/validation';
@@ -34,7 +35,7 @@ const RECENT_WINDOW = 10;
 const SUMMARY_EVERY = 20;
 
 export interface PipelineResult {
-  decision: ReplyDecision | 'SKIPPED_SPAM' | 'SKIPPED_AI_DISABLED' | 'ALREADY_PROCESSED' | 'NOT_INBOUND';
+  decision: ReplyDecision | 'SKIPPED_SPAM' | 'SKIPPED_AI_DISABLED' | 'SKIPPED_ACCOUNT_BLOCKED' | 'ALREADY_PROCESSED' | 'NOT_INBOUND';
   suggestionId?: string;
   intent?: Intent;
   confidence?: number;
@@ -137,6 +138,8 @@ async function runPipeline(messageId: string, opts: { force?: boolean; requested
 
   const settings = client.settings ?? (await db.clientSettings.create({ data: { clientId: client.id, organizationId: client.organizationId } }));
   if (!settings.aiEnabled) return { decision: 'SKIPPED_AI_DISABLED' };
+  // Blocked customers keep receiving messages, but no AI credits are spent on them.
+  if ((await organizationAccess(conversation.organizationId)).state === 'blocked') return { decision: 'SKIPPED_ACCOUNT_BLOCKED' };
   const genLog = generationLogger({ organizationId: conversation.organizationId, clientId: client.id, userId: opts.requestedBy?.userId });
   const brand = brandContext(client.brandProfile, client.name);
   const channel = conversation.type === 'COMMENT' ? 'COMMENT' : 'DIRECT_MESSAGE';

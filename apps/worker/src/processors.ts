@@ -52,7 +52,8 @@ export async function analyticsProcessor(job: Job<JobPayloads['analytics']>) {
     // Collect today's metrics for every active account (one job per account).
     const now = new Date();
     const from = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-    const accounts = await db.socialAccount.findMany({ where: { status: 'ACTIVE' }, select: { id: true, capabilities: true } });
+    // Mock accounts can't be read with mock mode off; skip them instead of failing a job per account.
+    const accounts = await db.socialAccount.findMany({ where: { status: 'ACTIVE', ...(getInfra().social.mockEnabled ? {} : { isMock: false }) }, select: { id: true, capabilities: true } });
     for (const a of accounts) {
       if ((a.capabilities as { analytics?: boolean })?.analytics) {
         await queues.add('analytics', { socialAccountId: a.id, from: from.toISOString(), to: now.toISOString() }, { attempts: 3, backoff: { type: 'exponential', delay: 60_000 } });

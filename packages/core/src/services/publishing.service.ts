@@ -1,4 +1,5 @@
 import type { Prisma } from '@socialpilot/database';
+import { organizationAccess } from './billing.service';
 import { getPlatformCapabilities, isSocialApiError, SocialApiError, validateContentForPlatform } from '@socialpilot/social';
 import { systemContext } from '../context';
 import { getInfra } from '../infra';
@@ -75,6 +76,8 @@ export async function executePublish(scheduledPostId: string, attempt: number): 
     return { status: 'failed', error: 'Unknown outcome of interrupted publish' };
   }
   if (existing.scheduledAt.getTime() > Date.now() + 5_000) return { status: 'skipped', reason: 'Not due yet' };
+  // A blocked (unpaid or suspended) customer's posts wait instead of failing; they go out once access returns.
+  if ((await organizationAccess(existing.organizationId)).state === 'blocked') return { status: 'rate_limited', retryAfterMs: 60 * 60 * 1000 };
 
   const post = await db.scheduledPost.findUniqueOrThrow({
     where: { id: scheduledPostId },

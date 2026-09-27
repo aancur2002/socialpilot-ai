@@ -63,9 +63,13 @@ export async function authRoutes(app: FastifyInstance) {
   app.post('/organizations', { schema: { tags: ['organizations'], body: doc(createOrganizationSchema) } }, async (req, reply) => {
     const user = requireUser(req);
     const input = parse(createOrganizationSchema, req.body);
+    // With sign-up closed, new organizations come only from the platform admin.
+    if (!user.isSuperAdmin && !(await core.publicSignupSettings()).allowPublicSignup) throw new core.AppError('FORBIDDEN', 'New organizations are created by your provider.');
     const org = await core.createOrganizationForUser(user.id, input.name);
     return reply.status(201).send(org);
   });
+
+  app.get('/public/signup', { schema: { tags: ['auth'] } }, async () => core.publicSignupSettings());
 
   app.get('/organizations', { schema: { tags: ['organizations'] } }, async (req) => core.listUserOrganizations(requireUser(req).id));
 }

@@ -29,3 +29,4 @@ export * from './services/reply.service';
 export * from './services/analytics.service';
 export * from './services/admin.service';
 export * from './services/platform-credentials.service';
+export * from './services/billing.service';

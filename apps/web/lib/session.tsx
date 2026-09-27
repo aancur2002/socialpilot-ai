@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { api, ApiError, getCurrentOrg, setCurrentOrg } from './api';
 import type { Client, CurrentOrg, Me } from './types';
+import { BlockedScreen } from '@/components/billing';
 
 interface SessionValue {
   me: Me;
@@ -57,7 +58,9 @@ export function SessionProvider({ children, fallback }: { children: ReactNode; f
   }, [me.data, router]);
 
   const org = useQuery({ queryKey: ['org'], queryFn: () => api<CurrentOrg>('/organizations/current'), enabled: orgReady });
-  const clients = useQuery({ queryKey: ['clients'], queryFn: () => api<Client[]>('/clients'), enabled: orgReady });
+  const blocked = org.data?.access.state === 'blocked';
+  // A blocked organization can't load its data; only its billing page is reachable.
+  const clients = useQuery({ queryKey: ['clients'], queryFn: () => api<Client[]>('/clients'), enabled: orgReady && Boolean(org.data) && !blocked });
 
   useEffect(() => {
     if (org.data?.onboardingStep === 'create_client' && clients.data && clients.data.length === 0) router.replace('/onboarding');
@@ -90,6 +93,22 @@ export function SessionProvider({ children, fallback }: { children: ReactNode; f
     return { me: me.data, org: org.data, clients: clients.data, can: (p) => perms.has(p), clientId: validClient, setClientId, switchOrg };
   }, [me.data, org.data, clients.data, clientId, setClientId, switchOrg]);
 
+  if (me.data && org.data?.access.state === 'blocked') {
+    const perms = new Set(org.data.permissions);
+    return (
+      <BlockedScreen
+        orgName={org.data.name}
+        access={org.data.access}
+        canSeeBilling={perms.has('settings:manage')}
+        otherOrgs={me.data.organizations.filter((o) => o.id !== org.data!.id).map((o) => ({ id: o.id, name: o.name, onSelect: () => switchOrg(o.id) }))}
+        onSignOut={async () => {
+          await api('/auth/logout', { body: {} }).catch(() => undefined);
+          qc.clear();
+          window.location.assign('/login');
+        }}
+      />
+    );
+  }
   if (!value) return <>{fallback}</>;
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

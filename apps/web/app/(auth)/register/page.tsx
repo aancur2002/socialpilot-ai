@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { registerSchema } from '@socialpilot/validation';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import type { z } from 'zod';
@@ -16,6 +17,7 @@ export default function RegisterPage() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const { register, handleSubmit, formState } = useForm<Form>({ resolver: zodResolver(registerSchema) });
+  const signup = useQuery({ queryKey: ['public-signup'], queryFn: () => api<{ allowPublicSignup: boolean }>('/public/signup') });
 
   const onSubmit = handleSubmit(async (values) => {
     setError(null);
@@ -27,6 +29,16 @@ export default function RegisterPage() {
       setError(errorMessage(e));
     }
   });
+
+  if (signup.data && !signup.data.allowPublicSignup) {
+    return (
+      <>
+        <h1 className="text-2xl font-semibold">Sign-up is by invitation</h1>
+        <p className="mt-2 text-sm text-ink-2">Accounts are created by your provider. If you already have one, sign in with the email and password you were given.</p>
+        <Link href="/login" className="mt-6 inline-block font-medium text-clearance hover:underline">Go to sign in</Link>
+      </>
+    );
+  }
 
   return (
     <>

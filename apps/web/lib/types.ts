@@ -2,6 +2,7 @@
 import type { PlatformKey, IntentKey } from '@socialpilot/validation';
 
 export type { PlatformKey, IntentKey };
+import type { Access } from '@/components/billing';
 
 export interface Me {
   user: { id: string; email: string; name: string; isSuperAdmin: boolean };
@@ -12,6 +13,7 @@ export interface CurrentOrg {
   id: string;
   name: string;
   plan: string;
+  access: Access;
   role: string;
   permissions: string[];
   clientIds: string[] | null;

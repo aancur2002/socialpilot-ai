@@ -16,8 +16,10 @@ export async function organizationRoutes(app: FastifyInstance) {
   app.get('/organizations/current', { schema: { tags: ['organizations'] } }, async (req) => {
     const ctx = await requireCtx(req);
     const org = await core.getOrganization(ctx);
-    return { ...org, role: ctx.role, permissions: [...ctx.permissions], clientIds: ctx.clientIds, mockMode: core.getInfra().social.mockEnabled };
+    return { ...org, role: ctx.role, permissions: [...ctx.permissions], clientIds: ctx.clientIds, mockMode: core.getInfra().social.mockEnabled, access: await core.organizationAccess(ctx.organizationId) };
   });
+
+  app.get('/billing', { schema: { tags: ['organizations'] } }, async (req) => core.getBilling(await requireCtx(req)));
 
   app.patch('/organizations/current', { schema: { tags: ['organizations'], body: doc(updateOrganizationSchema) } }, async (req) =>
     core.updateOrganization(await requireCtx(req), parse(updateOrganizationSchema, req.body)),

@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { loginSchema } from '@socialpilot/validation';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import type { z } from 'zod';
@@ -15,6 +16,7 @@ type Form = z.input<typeof loginSchema>;
 
 export default function LoginPage() {
   const router = useRouter();
+  const signup = useQuery({ queryKey: ['public-signup'], queryFn: () => api<{ allowPublicSignup: boolean }>('/public/signup') });
   const [error, setError] = useState<string | null>(null);
   const { register, handleSubmit, formState } = useForm<Form>({ resolver: zodResolver(loginSchema) });
 
@@ -49,12 +51,14 @@ export default function LoginPage() {
           Sign in
         </Button>
       </form>
-      <p className="mt-6 text-sm text-ink-2">
-        New to SocialPilot?{' '}
-        <Link href="/register" className="font-medium text-clearance hover:underline">
-          Create an account
-        </Link>
-      </p>
+      {signup.data?.allowPublicSignup !== false && (
+        <p className="mt-6 text-sm text-ink-2">
+          New to SocialPilot?{' '}
+          <Link href="/register" className="font-medium text-clearance hover:underline">
+            Create an account
+          </Link>
+        </p>
+      )}
     </>
   );
 }

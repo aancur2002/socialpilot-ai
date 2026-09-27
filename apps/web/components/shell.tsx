@@ -24,8 +24,10 @@ import {
   Users,
   Workflow,
   X,
+  CreditCard,
 } from 'lucide-react';
 import Link from 'next/link';
+import { daysUntil } from './billing';
 import { usePathname, useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
 import { useState, type ReactNode } from 'react';
@@ -172,7 +174,15 @@ function Notifications() {
 }
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const { me, org, switchOrg } = useSession();
+  const { me, org, switchOrg, can } = useSession();
+  // Owners see a reminder when payment is due or a trial ends within 5 days.
+  const billingNotice = !can('settings:manage')
+    ? null
+    : org.access.state === 'grace'
+      ? `Payment is due. Access pauses in ${Math.max(0, daysUntil(org.access.blockAt))} days. See billing.`
+      : org.access.state === 'trial' && org.access.endsAt && daysUntil(org.access.endsAt) <= 5
+        ? `Your free trial ends in ${Math.max(0, daysUntil(org.access.endsAt))} days. See billing.`
+        : null;
   const { resolvedTheme, setTheme } = useTheme();
   const [mobileNav, setMobileNav] = useState(false);
   const router = useRouter();
@@ -193,7 +203,13 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         </div>
       )}
-      <div className="min-w-0" style={{ ['--banner-h' as string]: org.mockMode ? '28px' : '0px' }}>
+      <div className="min-w-0" style={{ ['--banner-h' as string]: `${(org.mockMode ? 28 : 0) + (billingNotice ? 28 : 0)}px` }}>
+        {billingNotice && (
+          <Link href="/settings?tab=billing" className="flex h-7 items-center gap-2 overflow-hidden bg-alert-soft px-4 text-xs text-alert hover:underline" role="status">
+            <CreditCard className="h-3.5 w-3.5" aria-hidden />
+            <span className="truncate">{billingNotice}</span>
+          </Link>
+        )}
         {org.mockMode && (
           <div className="flex h-7 items-center gap-2 overflow-hidden bg-runway-soft px-4 text-xs text-[#6b4608] dark:text-runway" role="status">
             <Bot className="h-3.5 w-3.5" aria-hidden />

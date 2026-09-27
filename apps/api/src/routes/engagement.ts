@@ -1,5 +1,12 @@
 import * as core from '@socialpilot/core';
 import {
+  createCustomerSchema,
+  PLAN_KEYS,
+  planPriceSchema,
+  platformSettingsSchema,
+  recordPaymentSchema,
+  resetPasswordSchema,
+  updateCustomerSchema,
   analyticsQuerySchema,
   conversationListQuerySchema,
   createAutomationRuleSchema,
@@ -203,5 +210,30 @@ export async function adminRoutes(app: FastifyInstance) {
   );
   app.post('/admin/integrations/:platform/check', { config: { rateLimit: { max: 20, timeWindow: '1 minute' } }, schema: { tags: ['admin'] } }, async (req) =>
     core.checkPlatformSetup(requireUser(req), parse(platformParam, req.params).platform),
+  );
+
+  // SaaS billing: platform settings, plan prices, customer accounts and payments.
+  app.get('/admin/settings', { schema: { tags: ['admin'] } }, async (req) => {
+    const user = requireUser(req);
+    if (!user.isSuperAdmin) throw new core.AppError('FORBIDDEN', 'Super admin only');
+    return core.getPlatformSettings();
+  });
+  app.put('/admin/settings', { schema: { tags: ['admin'], body: doc(platformSettingsSchema) } }, async (req) => core.updatePlatformSettings(requireUser(req), parse(platformSettingsSchema, req.body)));
+  app.get('/admin/plans', { schema: { tags: ['admin'] } }, async (req) => {
+    const user = requireUser(req);
+    if (!user.isSuperAdmin) throw new core.AppError('FORBIDDEN', 'Super admin only');
+    return core.listPlans();
+  });
+  const planParam = z.object({ plan: z.enum(PLAN_KEYS) });
+  app.put('/admin/plans/:plan', { schema: { tags: ['admin'], body: doc(planPriceSchema) } }, async (req) => core.updatePlan(requireUser(req), parse(planParam, req.params).plan, parse(planPriceSchema, req.body)));
+  app.get('/admin/customers', { schema: { tags: ['admin'] } }, async (req) => core.adminListCustomers(requireUser(req)));
+  app.post('/admin/customers', { config: { rateLimit: { max: 20, timeWindow: '1 minute' } }, schema: { tags: ['admin'], body: doc(createCustomerSchema) } }, async (req, reply) =>
+    reply.status(201).send(await core.adminCreateCustomer(requireUser(req), parse(createCustomerSchema, req.body))),
+  );
+  app.get('/admin/customers/:id', { schema: { tags: ['admin'] } }, async (req) => core.adminGetCustomer(requireUser(req), parse(idParam, req.params).id));
+  app.patch('/admin/customers/:id', { schema: { tags: ['admin'], body: doc(updateCustomerSchema) } }, async (req) => core.adminUpdateCustomer(requireUser(req), parse(idParam, req.params).id, parse(updateCustomerSchema, req.body)));
+  app.post('/admin/customers/:id/payments', { schema: { tags: ['admin'], body: doc(recordPaymentSchema) } }, async (req) => core.adminRecordPayment(requireUser(req), parse(idParam, req.params).id, parse(recordPaymentSchema, req.body)));
+  app.post('/admin/users/:id/reset-password', { config: { rateLimit: { max: 20, timeWindow: '1 minute' } }, schema: { tags: ['admin'], body: doc(resetPasswordSchema) } }, async (req) =>
+    core.adminResetPassword(requireUser(req), parse(idParam, req.params).id, parse(resetPasswordSchema, req.body)),
   );
 }
