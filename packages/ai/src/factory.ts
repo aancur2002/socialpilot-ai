@@ -4,7 +4,7 @@ import { OpenAIEmbeddingProvider, OpenAIProvider } from './providers/openai';
 import type { AIProvider, EmbeddingProvider } from './providers/types';
 
 export interface AiFactoryConfig {
-  provider: 'anthropic' | 'openai' | 'google' | 'nvidia' | 'mock';
+  provider: 'anthropic' | 'openai' | 'google' | 'nvidia' | 'meta' | 'mock';
   apiKey?: string;
   model?: string;
   fastModel?: string;
@@ -22,6 +22,7 @@ export function createAIProvider(config: AiFactoryConfig): AIProvider {
     case 'openai':
     case 'google':
     case 'nvidia':
+    case 'meta':
       if (!config.apiKey) throw new Error(`AI_API_KEY is required for the ${config.provider} provider`);
       return new OpenAIProvider({
         apiKey: config.apiKey,

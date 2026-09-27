@@ -64,7 +64,7 @@ Every variable is documented in [`env.example`](env.example) and validated at st
 | `DATABASE_URL`, `REDIS_URL` | Postgres 16 with pgvector, and Redis |
 | `ENCRYPTION_KEY` | 32-byte base64 key for AES-256-GCM encryption of OAuth tokens (rotation: `ENCRYPTION_KEY_VERSION`, `ENCRYPTION_KEY_PREVIOUS`) |
 | `JWT_SECRET` | Signs cookies and derived secrets |
-| `AI_PROVIDER` | `mock` (offline, deterministic), `anthropic` or `openai`, with `AI_API_KEY`. Each organization can override the provider, models and key in **Settings → AI models** |
+| `AI_PROVIDER` | `mock` (offline, deterministic), `meta` (Meta Model API, Muse Spark), `anthropic`, `openai`, `google` or `nvidia`, with `AI_API_KEY`. Each organization can override the provider, models and key in **Settings → AI models** |
 | `EMBEDDING_PROVIDER` | `mock` (local hashing, lexical only) or `openai` |
 | `STORAGE_DRIVER` | `local` (development) or `s3` with the `S3_*` settings |
 | `SOCIAL_MOCK_MODE` | Enables the Mock* adapters. Refused in production |

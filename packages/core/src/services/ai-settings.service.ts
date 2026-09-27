@@ -15,6 +15,8 @@ export const MODEL_SUGGESTIONS = {
   // Providers rename models often: these are starting points, any model ID can be typed.
   google: ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite', 'gemini-3.1-pro-preview'],
   nvidia: ['meta/llama-3.3-70b-instruct', 'meta/llama-3.1-8b-instruct', 'nvidia/llama-3.3-nemotron-super-49b-v1', 'deepseek-ai/deepseek-r1', 'qwen/qwen2.5-coder-32b-instruct'],
+  // Meta Model API (Muse Spark). The -contributor versions are discounted.
+  meta: ['muse-spark-1.3', 'muse-spark-1.2', 'muse-spark-1.1', 'muse-spark-1.3-contributor', 'muse-spark-1.2-contributor'],
   embeddings: {
     openai: ['text-embedding-3-small'],
     google: ['gemini-embedding-001', 'gemini-embedding-2-preview'],
@@ -22,7 +24,7 @@ export const MODEL_SUGGESTIONS = {
   },
 } as const;
 
-type Provider = 'anthropic' | 'openai' | 'google' | 'nvidia' | 'mock';
+type Provider = 'anthropic' | 'openai' | 'google' | 'nvidia' | 'meta' | 'mock';
 type EmbeddingProviderKey = 'openai' | 'google' | 'nvidia' | 'mock';
 
 interface Resolved {
@@ -282,7 +284,7 @@ export async function updateAiSettings(ctx: AuthContext, input: AiSettingsInput)
   return { ...(await getAiSettings(ctx)), reindexRequired: embeddingChanged };
 }
 
-const NON_TEXT_MODEL = /embed|tts|imagen|veo|image-generation|rerank|guard|aqa|audio|parse|clip|vila/i;
+const NON_TEXT_MODEL = /embed|tts|imagen|veo|image-generation|rerank|guard|aqa|audio|parse|clip|vila|muse-image|transcribe|^sam-/i;
 
 /** Which key to use for a provider when listing models: typed > saved (primary, backup, embeddings) > .env. */
 function keyForProvider(organizationId: string, row: Partial<OrganizationAiSettings> | null, provider: string, typed?: string): string | undefined {

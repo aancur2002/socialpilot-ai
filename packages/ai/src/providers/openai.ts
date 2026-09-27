@@ -15,10 +15,11 @@ import {
 
 /**
  * OpenAI-compatible chat and embedding providers. OpenAI itself, Google Gemini
- * (its OpenAI compatibility endpoint) and NVIDIA NIM (build.nvidia.com) all speak
- * this API, with small differences captured in the presets below.
+ * (its OpenAI compatibility endpoint), NVIDIA NIM (build.nvidia.com) and the Meta
+ * Model API (Muse Spark) all speak this API, with small differences captured in the
+ * presets below.
  */
-export type CompatibleProvider = 'openai' | 'google' | 'nvidia';
+export type CompatibleProvider = 'openai' | 'google' | 'nvidia' | 'meta';
 
 interface Preset {
   label: string;
@@ -34,6 +35,10 @@ interface Preset {
   embeddingDimensionsParam: boolean;
   /** Asymmetric embedding models need input_type=query|passage (NVIDIA retrieval models). */
   embeddingInputType: boolean;
+  /** Sends reasoning_effort: minimal for the fast tier, the caller's effort (or low) otherwise. */
+  reasoningEffort?: boolean;
+  /** Returned by listModels when the service has no /models endpoint. */
+  knownModels?: string[];
 }
 
 export const COMPATIBLE_PRESETS: Record<CompatibleProvider, Preset> = {
@@ -69,6 +74,20 @@ export const COMPATIBLE_PRESETS: Record<CompatibleProvider, Preset> = {
     structured: 'negotiate',
     embeddingDimensionsParam: false,
     embeddingInputType: true,
+  },
+  meta: {
+    label: 'Meta Model API',
+    baseUrl: 'https://api.meta.ai/v1',
+    model: 'muse-spark-1.3',
+    fastModel: 'muse-spark-1.3',
+    // No embedding model: knowledge search pairs Meta text with Google or NVIDIA embeddings.
+    embeddingModel: '',
+    maxTokensParam: 'max_completion_tokens',
+    structured: 'strict',
+    embeddingDimensionsParam: false,
+    embeddingInputType: false,
+    reasoningEffort: true,
+    knownModels: ['muse-spark-1.3', 'muse-spark-1.2', 'muse-spark-1.1', 'muse-spark-1.3-contributor', 'muse-spark-1.2-contributor'],
   },
 };
 
@@ -177,10 +196,12 @@ export class OpenAIProvider implements AIProvider {
   }
 
   private async complete(input: GenerateTextInput, responseFormat?: unknown, extraSystem?: string) {
-    const model = this.modelFor(input.tier ?? 'default');
+    const tier = input.tier ?? 'default';
+    const model = this.modelFor(tier);
     const res = await compatibleFetch<ChatCompletion>(this.fetchImpl, this.preset.label, this.baseUrl, this.config.apiKey, '/chat/completions', {
       model,
       [this.preset.maxTokensParam]: input.maxTokens ?? 4096,
+      ...(this.preset.reasoningEffort ? { reasoning_effort: tier === 'fast' ? 'minimal' : (input.effort ?? 'low') } : {}),
       messages: [{ role: 'system', content: extraSystem ? `${input.system}\n\n${extraSystem}` : input.system }, ...input.messages],
       ...(responseFormat ? { response_format: responseFormat } : {}),
     });
@@ -197,7 +218,13 @@ export class OpenAIProvider implements AIProvider {
 
   /** Model IDs this key can use, straight from the service's /models endpoint. */
   async listModels(): Promise<string[]> {
-    return listCompatibleModels(this.fetchImpl, this.preset.label, this.baseUrl, this.config.apiKey);
+    try {
+      return await listCompatibleModels(this.fetchImpl, this.preset.label, this.baseUrl, this.config.apiKey);
+    } catch (error) {
+      // Only a missing endpoint falls back; a bad key must still surface.
+      if (this.preset.knownModels && error instanceof AiProviderError && error.kind === 'invalid_request') return this.preset.knownModels;
+      throw error;
+    }
   }
 
   /**

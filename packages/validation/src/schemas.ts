@@ -358,7 +358,7 @@ export const updateKnowledgeSourceSchema = z
   .refine((v) => v.title !== undefined || v.content !== undefined, { message: 'Nothing to update' });
 
 // ── AI model settings (per organization) ────────────────────────────────
-export const AI_PROVIDERS = ['anthropic', 'openai', 'google', 'nvidia', 'mock'] as const;
+export const AI_PROVIDERS = ['anthropic', 'openai', 'google', 'nvidia', 'meta', 'mock'] as const;
 export const EMBEDDING_PROVIDERS = ['openai', 'google', 'nvidia', 'mock'] as const;
 const modelId = z.string().trim().min(1).max(120).regex(/^[A-Za-z0-9._:/@-]+$/, 'Model IDs contain letters, numbers, dots, dashes, slashes or colons');
 export const aiSettingsSchema = z.object({

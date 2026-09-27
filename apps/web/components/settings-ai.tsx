@@ -23,7 +23,7 @@ interface AiSettingsView {
   effective: { provider: string; model: string; fastModel: string; embeddingProvider: string; embeddingModel: string; apiKeySource: 'organization' | 'server' | 'none'; chain: { provider: string; model: string }[] };
   serverDefaults: { provider: string; model: string | null; fastModel: string | null; embeddingProvider: string };
   mockAllowed: boolean;
-  suggestions: Record<'anthropic' | 'openai' | 'google' | 'nvidia', string[]> & { embeddings: Record<'openai' | 'google' | 'nvidia', string[]> };
+  suggestions: Record<'anthropic' | 'openai' | 'google' | 'nvidia' | 'meta', string[]> & { embeddings: Record<'openai' | 'google' | 'nvidia', string[]> };
   reindexRequired?: boolean;
 }
 
@@ -47,6 +47,7 @@ const PROVIDER_NAMES: Record<string, string> = {
   openai: 'OpenAI or compatible',
   google: 'Google Gemini',
   nvidia: 'NVIDIA NIM',
+  meta: 'Meta Model API (Muse Spark)',
   mock: 'Mock (offline, development only)',
 };
 
@@ -56,6 +57,7 @@ const KEY_HELP: Record<string, string> = {
   openai: 'Create a key at platform.openai.com, or use your gateway’s key with its base URL.',
   google: 'Free tier available: create a key at aistudio.google.com (Get API key). Free-tier limits are low and prompts may be used to improve Google’s products, so use it for testing.',
   nvidia: 'Free credits available: sign in at build.nvidia.com, open any model and choose Get API Key (keys start with nvapi-). Good for testing Llama, Nemotron, DeepSeek and more.',
+  meta: 'Create a key at dev.meta.ai (Meta Model API). Muse Spark writes posts and replies; Meta has no embedding model, so keep Google or NVIDIA below for knowledge search.',
 };
 
 const EMBEDDING_NAMES: Record<string, string> = {
@@ -149,7 +151,7 @@ export function AiModelSettings() {
   const provider = f.provider || d.serverDefaults.provider;
   const suggestions = provider === 'mock' ? [] : modelsFor('text', provider, d.suggestions[provider as 'anthropic'] ?? []);
   const embeddingProvider = f.embeddingProvider || d.serverDefaults.embeddingProvider;
-  const allProviders = ['anthropic', 'openai', 'google', 'nvidia', ...(d.mockAllowed ? ['mock'] : [])];
+  const allProviders = ['meta', 'anthropic', 'openai', 'google', 'nvidia', ...(d.mockAllowed ? ['mock'] : [])];
   const usedBy = (i: number) => new Set([provider, ...backups.filter((_, j) => j !== i).map((b) => b.provider)]);
   const updateBackup = (i: number, patch: Partial<BackupRow>) => setBackups((rows) => rows.map((r, j) => (j === i ? { ...r, ...patch } : r)));
   const moveBackup = (i: number, dir: -1 | 1) =>
@@ -205,6 +207,7 @@ export function AiModelSettings() {
             <Field label="Provider" htmlFor="ai-provider">
               <Select id="ai-provider" value={f.provider} onChange={(e) => setF({ ...f, provider: e.target.value, model: '', fastModel: '' })}>
                 <option value="">Server default ({PROVIDER_NAMES[d.serverDefaults.provider] ?? d.serverDefaults.provider})</option>
+                <option value="meta">{PROVIDER_NAMES.meta}</option>
                 <option value="anthropic">{PROVIDER_NAMES.anthropic}</option>
                 <option value="openai">{PROVIDER_NAMES.openai}</option>
                 <option value="google">{PROVIDER_NAMES.google} (free tier)</option>
@@ -219,7 +222,7 @@ export function AiModelSettings() {
                   <ModelPicker id="ai-model" value={f.model} placeholder={suggestions[0] ?? 'model-id'} onChange={(v) => setF({ ...f, model: v })} models={live('text', provider)} loading={isLoading('text', provider)} onLoad={() => loadModels.mutate({ provider, apiKey: f.apiKey, purpose: 'text' })} />
                 </Field>
                 <Field label="Fast model" htmlFor="ai-fast" hint="Used for quick tasks like intent detection. A smaller model lowers cost. Blank uses the main model.">
-                  <ModelPicker id="ai-fast" value={f.fastModel} placeholder={suggestions[1] ?? ''} onChange={(v) => setF({ ...f, fastModel: v })} models={live('text', provider)} loading={isLoading('text', provider)} onLoad={() => loadModels.mutate({ provider, apiKey: f.apiKey, purpose: 'text' })} />
+                  <ModelPicker id="ai-fast" value={f.fastModel} placeholder={provider === 'meta' ? suggestions[0] : (suggestions[1] ?? '')} onChange={(v) => setF({ ...f, fastModel: v })} models={live('text', provider)} loading={isLoading('text', provider)} onLoad={() => loadModels.mutate({ provider, apiKey: f.apiKey, purpose: 'text' })} />
                 </Field>
                 <KeyField id="ai-key" label="API key" status={d.saved.apiKey} value={f.apiKey} onChange={(v) => setF({ ...f, apiKey: v })} remove={f.removeKey} onRemove={(v) => setF({ ...f, removeKey: v })} />
                 {provider === 'openai' && (

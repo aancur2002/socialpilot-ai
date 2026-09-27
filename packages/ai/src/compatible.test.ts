@@ -109,6 +109,32 @@ describe('OpenAI-compatible providers', () => {
     expect(custom.modelFor('fast')).toBe('deepseek-ai/deepseek-r1');
   });
 
+  it('Meta: strict json_schema, max_completion_tokens, and reasoning effort by tier', async () => {
+    const { impl, calls } = fakeFetch([completion('{"answer":"hi","score":1}'), completion('ok')]);
+    const p = new OpenAIProvider({ apiKey: 'k', kind: 'meta', fetchImpl: impl });
+    expect((await call(p)).data).toEqual({ answer: 'hi', score: 1 });
+    expect(calls[0]!.url).toBe('https://api.meta.ai/v1/chat/completions');
+    expect(calls[0]!.body).toMatchObject({ model: 'muse-spark-1.3', reasoning_effort: 'low' });
+    expect(calls[0]!.body.max_completion_tokens).toBeDefined();
+    expect((calls[0]!.body.response_format as { type: string }).type).toBe('json_schema');
+    await p.generateText({ system: 's', messages: [{ role: 'user', content: 'x' }], tier: 'fast' });
+    expect(calls[1]!.body.reasoning_effort).toBe('minimal');
+    expect(calls[1]!.body.stop).toBeUndefined();
+  });
+
+  it('Meta: falls back to known models when there is no /models endpoint, but surfaces a bad key', async () => {
+    const missing = fakeFetch([{ status: 404, body: { error: { message: 'Not found' } } }]);
+    expect(await new OpenAIProvider({ apiKey: 'k', kind: 'meta', fetchImpl: missing.impl }).listModels()).toContain('muse-spark-1.3');
+    const badKey = fakeFetch([{ status: 401, body: { error: { message: 'Invalid key' } } }]);
+    await expect(new OpenAIProvider({ apiKey: 'k', kind: 'meta', fetchImpl: badKey.impl }).listModels()).rejects.toThrow(/401/);
+  });
+
+  it('does not send reasoning_effort to providers that do not take it', async () => {
+    const { impl, calls } = fakeFetch([completion('ok')]);
+    await new OpenAIProvider({ apiKey: 'k', kind: 'google', fetchImpl: impl }).generateText({ system: 's', messages: [{ role: 'user', content: 'x' }] });
+    expect(calls[0]!.body.reasoning_effort).toBeUndefined();
+  });
+
   it('factory builds Google and NVIDIA providers', () => {
     expect(createAIProvider({ provider: 'google', apiKey: 'k', embeddingProvider: 'mock' }).name).toBe('google');
     expect(createEmbeddingProvider({ provider: 'nvidia', apiKey: 'k', embeddingProvider: 'nvidia' }).model).toBe('nvidia/nv-embedqa-e5-v5');

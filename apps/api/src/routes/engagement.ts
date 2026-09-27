@@ -180,7 +180,7 @@ export async function aiSettingsRoutes(app: FastifyInstance) {
   app.get('/ai-settings', { schema: { tags: ['ai'] } }, async (req) => core.getAiSettings(await requireCtx(req)));
   app.put('/ai-settings', { schema: { tags: ['ai'], body: doc(aiSettingsSchema) } }, async (req) => core.updateAiSettings(await requireCtx(req), parse(aiSettingsSchema, req.body)));
   app.post('/ai-settings/models', { config: { rateLimit: { max: 20, timeWindow: '1 minute' } }, schema: { tags: ['ai'] } }, async (req) => {
-    const body = parse(z.object({ provider: z.enum(['anthropic', 'openai', 'google', 'nvidia', 'mock']), apiKey: z.string().trim().min(8).max(500).optional(), purpose: z.enum(['text', 'embedding']).default('text') }), req.body);
+    const body = parse(z.object({ provider: z.enum(['anthropic', 'openai', 'google', 'nvidia', 'meta', 'mock']), apiKey: z.string().trim().min(8).max(500).optional(), purpose: z.enum(['text', 'embedding']).default('text') }), req.body);
     return core.listAvailableModels(await requireCtx(req), body);
   });
   app.post('/ai-settings/test', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } }, schema: { tags: ['ai'], body: doc(aiSettingsSchema) } }, async (req) =>

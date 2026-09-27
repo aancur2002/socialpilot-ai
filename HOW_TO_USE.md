@@ -186,7 +186,7 @@ Confidence is the AI's own estimate used for routing. It isn't a guarantee of ac
 
 ### 5.2 AI models (Settings → AI models), for owners and admins
 Choose the AI used for your whole agency:
-- **Provider**: Anthropic (Claude), OpenAI (or compatible), **Google Gemini** (free tier, key from aistudio.google.com), **NVIDIA NIM** (free credits, key from build.nvidia.com), or the server default. The free options are good for testing without API costs.
+- **Provider**: **Meta Model API** (Muse Spark, key from dev.meta.ai; it has no embedding model, so pair it with Google or NVIDIA embeddings), Anthropic (Claude), OpenAI (or compatible), **Google Gemini** (free tier, key from aistudio.google.com), **NVIDIA NIM** (free credits, key from build.nvidia.com), or the server default. The free options are good for testing without API costs.
 - **Main model** and **Fast model**: click **Load models from provider** to get the models your key can use, then pick one (or type any model ID). The fast model handles quick tasks such as intent detection; a smaller model costs less. Providers retire models often, so if a test says a model isn't found, load the list again.
 - **Backup providers**: add up to 3 (for example Google Gemini first, NVIDIA NIM as backup), each with its own key. If one fails because of a limit, used-up free quota, bad key or outage, the request goes to the next one automatically.
 - **API key**: paste it once. It's encrypted and only its last four characters are shown afterwards. Leave it blank to use the server key from `.env`.
