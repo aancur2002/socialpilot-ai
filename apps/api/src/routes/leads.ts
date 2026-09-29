@@ -76,6 +76,16 @@ export async function leadCaptureRoutes(app: FastifyInstance) {
     return reply.status(201).send(await core.ingestLeadViaApi(key, (req.body ?? {}) as Record<string, unknown>));
   });
   app.get('/public/legal', { schema: { tags: ['public'] } }, async () => core.publicLegal());
+  app.get('/public/plans', { schema: { tags: ['public'] } }, async (_req, reply) => {
+    reply.header('cache-control', 'public, max-age=60');
+    const [plans, settings] = await Promise.all([core.listPlans(), core.getPlatformSettings()]);
+    // Only plans marked public, and only what a visitor needs to compare them.
+    return {
+      currency: settings.currency,
+      allowPublicSignup: settings.allowPublicSignup,
+      plans: plans.filter((p) => p.public).map(({ plan, name, description, priceCents, limits }) => ({ plan, name, description, priceCents, limits })),
+    };
+  });
 }
 
 /** Forgot password (signed out). */

@@ -104,7 +104,7 @@ function retryDelayMs(res: Response): number {
  * (rate limited), since those often clear within seconds. Persistent failures are
  * left to the caller, where a failover chain moves on to the next provider.
  */
-async function compatibleFetch<T>(fetchImpl: FetchImpl, label: string, baseUrl: string, apiKey: string, path: string, body?: unknown): Promise<T> {
+export async function compatibleFetch<T>(fetchImpl: FetchImpl, label: string, baseUrl: string, apiKey: string, path: string, body?: unknown): Promise<T> {
   try {
     return await compatibleFetchOnce<T>(fetchImpl, label, baseUrl, apiKey, path, body);
   } catch (error) {

@@ -18,10 +18,11 @@ Every AI step runs on Muse Spark through `https://api.meta.ai/v1`:
 | Confidence routing | High confidence can auto-send (if the client allows it); low confidence or complaints go to a person | (rules) |
 | Lead capture | Pulls name, need and contact details out of a conversation into the CRM | minimal |
 | Reports | Summarizes a client's month in plain language | medium |
+| Post images | **Muse Image** (`muse-image-1.0`) turns each post's creative brief into a PNG sized for the platform (portrait for Instagram and TikTok, landscape for LinkedIn, square for Facebook) | n/a |
 
 Structured steps use strict JSON schema output, and every result is checked before it's used. Quick classification steps ask for `reasoning_effort: minimal` to keep credit use low; writing steps use `medium`.
 
-Knowledge search needs embeddings, which the Meta Model API doesn't offer, so it uses Google Gemini or NVIDIA embeddings. Both have free tiers.
+Images cost $0.01 each and count toward the plan's monthly AI allowance, like text generations. Knowledge search needs embeddings, which the Meta Model API doesn't offer, so it uses Google Gemini or NVIDIA embeddings. Both have free tiers.
 
 ## Setup with a Meta key (about 5 minutes)
 
@@ -36,10 +37,10 @@ Knowledge search needs embeddings, which the Meta Model API doesn't offer, so it
 ## Demo script (3 minutes)
 
 1. **Dashboard** (15 s): three client businesses, inbox count, scheduled posts.
-2. **AI content** (45 s): pick Bella's Bakery, ask for "weekend baking classes". Muse Spark writes Facebook, Instagram and LinkedIn versions in the bakery's voice. Submit it for approval.
+2. **AI content** (60 s): pick Bella's Bakery, ask for "weekend baking classes". Muse Spark writes Facebook, Instagram and LinkedIn versions in the bakery's voice. Click **Generate image** on the Instagram version: Muse Image draws it from the brief. Submit for approval.
 3. **Approvals** (20 s): approve it as the approver, then schedule it on the **Calendar**.
 4. **Inbox** (60 s): simulate a customer message, "Do you deliver to Kentish Town?". Show the intent label, the draft answer taken from the knowledge base, and the confidence score. Then send a complaint and show it escalate to a person instead of auto-replying.
-5. **Leads** (20 s): a message like "I need 40 cupcakes for a wedding on 12 May, call me on…" lands in the CRM with the details filled in.
+5. **Leads** (30 s): a message like "I need 40 cupcakes for a wedding on 12 May, call me on…" lands in the CRM with the details filled in. Then show **Lead capture**: a website form's embed code, and a submission arriving as a lead.
 6. **Close** (20 s): Meta models plus Meta platforms, tenant isolation, audit log, and it's a working multi-tenant SaaS, not a prototype.
 
 Record with mock social accounts unless your Meta app has passed App Review. Say so on camera: posts publish to real Pages once the app is approved.
@@ -48,13 +49,14 @@ Record with mock social accounts unless your Meta app has passed App Review. Say
 
 - [ ] The rules are published when applications open: read them, especially model-use and repository requirements.
 - [ ] `.env` and any keys are **not** in the repository (`git log -p | grep -i "api_key"` returns nothing real).
-- [ ] The README opens with the pitch above and a screenshot.
+- [x] The README opens with the pitch and screenshots.
+- [ ] Meta billing is active on your developer account (the key currently returns HTTP 402), then **Test connection** shows Meta as OK and **Generate image** produces a real picture.
+- [ ] Choose a license for the public repository.
 - [ ] Demo video recorded with the Meta provider selected (show **Settings → AI models** briefly).
 - [ ] `npm run test:all` passes.
 - [ ] Keep an eye on credit use: **Settings → General** shows AI generations this month, and your usage is also on the Meta developer dashboard.
 
 ## Ideas that would showcase more of Meta's models (not built yet)
 
-- **Muse Image** (`muse-image-1.0`): turn the AI's creative brief on each post into an actual image.
 - **Muse Voice Transcribe**: transcribe WhatsApp voice notes so they go through the same triage and reply flow.
 - **Responses API with web search**: let post ideas reference current local events.

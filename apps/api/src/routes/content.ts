@@ -85,6 +85,13 @@ export async function contentRoutes(app: FastifyInstance) {
     return core.regenerateVariant(await requireCtx(req), p.id, p.variantId, body.instructions);
   });
 
+  /** Muse Image: an image for this version from its creative brief (or a custom description). */
+  app.post('/content/:id/variants/:variantId/image', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } }, schema: { tags: ['content'] } }, async (req) => {
+    const p = parse(variantParams, req.params);
+    const body = parse(z.object({ prompt: z.string().trim().max(1000).optional() }), req.body);
+    return core.generateVariantImage(await requireCtx(req), p.id, p.variantId, body);
+  });
+
   app.post('/content/:id/submit', { schema: { tags: ['approvals'] } }, async (req) => core.submitForApproval(await requireCtx(req), parse(idParam, req.params).id));
 
   app.post('/content/:id/approve', { schema: { tags: ['approvals'], body: doc(approvalDecisionSchema) } }, async (req) =>

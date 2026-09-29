@@ -1,4 +1,4 @@
-import { ContentAgent, type BrandContext } from '@socialpilot/ai';
+import { ContentAgent, type BrandContext, type ImageShape } from '@socialpilot/ai';
 import type { ContentStatus, Platform, Prisma } from '@socialpilot/database';
 import { getPlatformCapabilities, validateContentForPlatform, type MediaRef } from '@socialpilot/social';
 import type { CreateContentInput, GenerateContentInput, VariantInput } from '@socialpilot/validation';
@@ -8,10 +8,11 @@ import { getInfra } from '../infra';
 import { paginate } from '../lib/util';
 import { audit } from './audit.service';
 import { generationLogger } from './ai-log.service';
-import { aiFor } from './ai-settings.service';
+import { aiFor, imageProviderFor } from './ai-settings.service';
 import { getClient, getClientSettings } from './client.service';
+import { uploadMedia } from './media.service';
 import { notifyClientMembers } from './notification.service';
-import { incrementUsage } from './organization.service';
+import { assertAiQuota, incrementUsage } from './organization.service';
 
 const contentInclude = {
   variants: { include: { media: { include: { media: true }, orderBy: { position: 'asc' } } }, orderBy: { platform: 'asc' } },
@@ -219,6 +220,7 @@ export async function generateContent(ctx: AuthContext, input: GenerateContentIn
   const client = await getClient(ctx, input.clientId);
   const settings = await getClientSettings(ctx.organizationId, client.id);
   if (!settings.aiEnabled) throw badRequest('AI is disabled for this client');
+  await assertAiQuota(ctx.organizationId);
   const publishable = input.platforms.filter((p) => getPlatformCapabilities(p).publishing);
   if (!publishable.length) throw badRequest('None of the selected platforms supports publishing posts');
 
@@ -278,6 +280,7 @@ export async function regenerateVariant(ctx: AuthContext, contentId: string, var
   if (!variant) throw notFound('Variant');
   const client = await getClient(ctx, content.clientId);
   const settings = await getClientSettings(ctx.organizationId, client.id);
+  await assertAiQuota(ctx.organizationId);
   const agent = new ContentAgent((await aiFor(ctx.organizationId)).ai, generationLogger({ organizationId: ctx.organizationId, clientId: client.id, userId: ctx.userId }));
   const outcome = await agent.generate({
     brand: brandContext(client.brandProfile, client.name),
@@ -522,3 +525,45 @@ export async function listCampaigns(ctx: ServiceContext, clientId?: string) {
   return getInfra().db.campaign.findMany({ where: tenantWhere(ctx, clientId), orderBy: { createdAt: 'desc' }, include: { _count: { select: { contents: true } } } });
 }
 
+
+// ── AI images (Muse Image) ──────────────────────────────────────────────
+
+const IMAGE_SHAPE: Record<string, ImageShape> = { INSTAGRAM: 'portrait', TIKTOK: 'portrait', FACEBOOK: 'square', LINKEDIN: 'landscape', WHATSAPP: 'square' };
+
+/**
+ * Generates an image for one platform version from its creative brief (or the
+ * given prompt) and stores it like an upload. The caller attaches it to the
+ * version, exactly as with an uploaded file.
+ */
+export async function generateVariantImage(ctx: AuthContext, contentId: string, variantId: string, input: { prompt?: string } = {}) {
+  requirePermission(ctx, 'content:edit');
+  const content = await loadContent(ctx, contentId);
+  const variant = content.variants.find((v) => v.id === variantId);
+  if (!variant) throw notFound('Variant');
+  const client = await getClient(ctx, content.clientId);
+  const settings = await getClientSettings(ctx.organizationId, client.id);
+  if (!settings.aiEnabled) throw badRequest('AI is disabled for this client');
+  const idea = input.prompt?.trim() || variant.mediaPrompt?.trim() || variant.caption.slice(0, 400);
+  if (!idea) throw badRequest('Write a short description of the image first');
+  await assertAiQuota(ctx.organizationId);
+
+  const brand = client.brandProfile;
+  const prompt = [
+    `A social media photo for ${brand?.brandName ?? client.name}${brand?.industry ? `, a ${brand.industry} business` : ''}${brand?.location ? ` in ${brand.location}` : ''}.`,
+    idea,
+    brand?.tone ? `Mood: ${brand.tone}.` : '',
+    'Natural, realistic, well lit. No text, words, logos or watermarks in the image.',
+  ].filter(Boolean).join(' ');
+
+  const provider = await imageProviderFor(ctx.organizationId);
+  let image;
+  try {
+    image = await provider.generate({ prompt, shape: IMAGE_SHAPE[variant.platform] ?? 'square', user: ctx.organizationId });
+  } catch (error) {
+    throw new AppError('INTEGRATION_ERROR', `Image generation failed: ${error instanceof Error ? error.message : 'unknown error'}`);
+  }
+  await incrementUsage(ctx.organizationId, 'aiGenerations');
+  const media = await uploadMedia(ctx, { clientId: client.id, fileName: `ai-image-${variant.platform.toLowerCase()}.png`, declaredMime: image.mimeType, data: image.data });
+  await audit(ctx, { action: 'content.image_generated', resourceType: 'MediaAsset', resourceId: media.id, clientId: client.id, after: { contentId, variantId, model: image.model, provider: provider.name } });
+  return { media, model: image.model, provider: provider.name, prompt };
+}

@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Copy, ExternalLink, ImagePlus, RefreshCw, Send, Trash2, X } from 'lucide-react';
+import { Copy, ExternalLink, ImagePlus, RefreshCw, Send, Sparkles, Trash2, X } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
@@ -60,6 +60,14 @@ function VariantEditor({ content, variant, accounts, caps, editable, onSaved }: 
     onSuccess: (m) => setMedia((list) => [...list, m]),
     onError: (e) => toast.error(errorMessage(e)),
   });
+  const generateImage = useMutation({
+    mutationFn: () => api<{ media: MediaAsset; provider: string }>(`/content/${content.id}/variants/${variant.id}/image`, { body: {} }),
+    onSuccess: (r) => {
+      setMedia((list) => [...list, r.media]);
+      toast.success(r.provider === 'mock' ? 'Placeholder image added (add a Meta key for real Muse Image pictures). Save the version to keep it.' : 'Image created with Muse Image. Save the version to keep it.');
+    },
+    onError: (e) => toast.error(errorMessage(e)),
+  });
 
   return (
     <Panel>
@@ -113,6 +121,16 @@ function VariantEditor({ content, variant, accounts, caps, editable, onSaved }: 
             {editable && (
               <button className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-[var(--radius-control)] border border-dashed border-line text-xs text-ink-3 hover:bg-surface-2" onClick={() => fileRef.current?.click()} disabled={upload.isPending}>
                 <ImagePlus className="h-5 w-5" /> {upload.isPending ? 'Uploading' : 'Add'}
+              </button>
+            )}
+            {editable && (
+              <button
+                className="flex h-20 w-24 flex-col items-center justify-center gap-1 rounded-[var(--radius-control)] border border-dashed border-clearance/50 px-1 text-center text-xs text-clearance hover:bg-clearance-soft disabled:opacity-60"
+                onClick={() => generateImage.mutate()}
+                disabled={generateImage.isPending}
+                title="Create an image from the creative brief with Meta Muse Image"
+              >
+                <Sparkles className={`h-5 w-5 ${generateImage.isPending ? 'animate-pulse' : ''}`} /> {generateImage.isPending ? 'Creating…' : 'Generate image'}
               </button>
             )}
             <input ref={fileRef} type="file" hidden accept="image/jpeg,image/png,image/gif,image/webp,video/mp4,video/quicktime,video/webm" onChange={(e) => e.target.files?.[0] && upload.mutate(e.target.files[0])} />

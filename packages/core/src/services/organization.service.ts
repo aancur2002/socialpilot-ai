@@ -35,6 +35,14 @@ export async function assertWithinLimit(organizationId: string, key: LimitKey, c
   }
 }
 
+/** Throws PLAN_LIMIT when this month's AI generations are used up (content writing, rewrites, images). */
+export async function assertAiQuota(organizationId: string): Promise<void> {
+  const [limits, usage] = await Promise.all([getLimits(organizationId), getUsage(organizationId)]);
+  if (usage.aiGenerations >= limits.aiGenerations) {
+    throw new AppError('PLAN_LIMIT', `This month's ${limits.aiGenerations.toLocaleString()} AI generations are used up. Upgrade the plan, or wait until the 1st.`, { key: 'aiGenerations', limit: limits.aiGenerations });
+  }
+}
+
 /** Monthly usage counters for metered features (AI generations, messages, posts). */
 export async function incrementUsage(organizationId: string, metric: 'aiGenerations' | 'posts' | 'messages', by = 1): Promise<void> {
   const period = currentPeriod();

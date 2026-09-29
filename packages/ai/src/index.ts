@@ -2,6 +2,7 @@ export * from './providers/types';
 export { AnthropicProvider, ANTHROPIC_DEFAULT_MODEL } from './providers/anthropic';
 export { OpenAIProvider, OpenAIEmbeddingProvider, COMPATIBLE_PRESETS, fitEmbedding, listCompatibleModels, type CompatibleProvider } from './providers/openai';
 export { FailoverAIProvider, type FailoverEvent } from './providers/failover';
+export { MetaImageProvider, MockImageProvider, MUSE_IMAGE_MODEL, encodePng, type ImageProvider, type ImageShape, type GeneratedImage } from './providers/image';
 export { MockAIProvider, HashingEmbeddingProvider, mockClassifyIntent } from './providers/mock';
 export { toStrictJsonSchema, extractJson } from './providers/json-schema';
 export * from './schemas';

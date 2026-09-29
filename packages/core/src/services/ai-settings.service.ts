@@ -1,4 +1,4 @@
-import { createAIProvider, createEmbeddingProvider, FailoverAIProvider, type AIProvider, type EmbeddingProvider } from '@socialpilot/ai';
+import { createAIProvider, createEmbeddingProvider, FailoverAIProvider, MetaImageProvider, MockImageProvider, type AIProvider, type EmbeddingProvider, type ImageProvider } from '@socialpilot/ai';
 import { decryptSecret, encryptSecret } from '@socialpilot/auth';
 import { isProduction } from '@socialpilot/config';
 import type { OrganizationAiSettings, Prisma } from '@socialpilot/database';
@@ -402,4 +402,19 @@ export async function testAiSettings(ctx: AuthContext, input: AiSettingsInput) {
   }
   const primary = chain[0]!;
   return { text: { ok: primary.ok, model: primary.model, latencyMs: primary.latencyMs, error: primary.error }, chain, embeddings };
+}
+
+/**
+ * Image generation uses Meta's Muse Image with the organization's Meta Model API
+ * key (main or backup provider in Settings → AI models, or the server's key when
+ * the server default is Meta). Outside production, without a key, an offline
+ * placeholder image is produced so the flow can be tried.
+ */
+export async function imageProviderFor(organizationId: string): Promise<ImageProvider> {
+  const { db, env } = getInfra();
+  const row = await db.organizationAiSettings.findUnique({ where: { organizationId } });
+  const key = keyForProvider(organizationId, row, 'meta');
+  if (key) return new MetaImageProvider({ apiKey: key });
+  if (!isProduction(env)) return new MockImageProvider();
+  throw badRequest('Image generation uses Meta Muse Image. Add a Meta Model API key in Settings → AI models (as the main or a backup provider).');
 }
