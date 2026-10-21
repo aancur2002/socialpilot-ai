@@ -19,12 +19,12 @@
     "@socialpilot/validation": "0.1.0",
     "bullmq": "5.81.5",
     "ioredis": "5.11.1",
-    "nodemailer": "^7.0.13",
+    "nodemailer": "10.1.7",
     "pdf-parse": "2.4.5",
-    "pino": "10.3.1",
-    "zod": "4.6.5"
+    "pino": "10.4.0",
+    "zod": "4.6.7"
   },
   "devDependencies": {
-    "@types/nodemailer": "^8.0.2"
+    "@types/nodemailer": "8.0.2"
   }
 }

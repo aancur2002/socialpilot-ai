@@ -10,13 +10,13 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@fastify/cookie": "11.1.2",
-    "@fastify/cors": "11.3.0",
-    "@fastify/helmet": "13.1.1",
-    "@fastify/multipart": "10.1.2",
-    "@fastify/rate-limit": "11.2.0",
-    "@fastify/swagger": "9.9.0",
-    "@fastify/swagger-ui": "6.1.1",
+    "@fastify/cookie": "11.1.3",
+    "@fastify/cors": "11.3.1",
+    "@fastify/helmet": "13.2.0",
+    "@fastify/multipart": "10.1.4",
+    "@fastify/rate-limit": "11.2.1",
+    "@fastify/swagger": "9.9.2",
+    "@fastify/swagger-ui": "6.1.2",
     "@socialpilot/ai": "0.1.0",
     "@socialpilot/auth": "0.1.0",
     "@socialpilot/config": "0.1.0",
@@ -24,7 +24,7 @@
     "@socialpilot/database": "0.1.0",
     "@socialpilot/social": "0.1.0",
     "@socialpilot/validation": "0.1.0",
-    "fastify": "5.12.5",
-    "zod": "4.6.5"
+    "fastify": "5.12.7",
+    "zod": "4.6.7"
   }
 }
