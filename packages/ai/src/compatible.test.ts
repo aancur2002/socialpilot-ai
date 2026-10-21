@@ -60,9 +60,24 @@ describe('OpenAI-compatible providers', () => {
     expect(calls[0]!.body.max_completion_tokens).toBeDefined();
   });
 
-  it('still rejects output that fails schema validation', async () => {
-    const { impl } = fakeFetch([completion('{"answer":"x"}')]);
+  it('still rejects output that fails schema validation (after one retry with the full schema)', async () => {
+    const { impl, calls } = fakeFetch([completion('{"answer":"x"}'), completion('{"answer":"x"}')]);
     await expect(call(new OpenAIProvider({ apiKey: 'k', kind: 'google', fetchImpl: impl }))).rejects.toThrow(/score/);
+    expect(calls).toHaveLength(2);
+  });
+
+  it('sends the schema once when the endpoint enforces it, and the full text only if output fails', async () => {
+    const system = (c: Call) => String((c.body.messages as { content: string }[])[0]!.content);
+    const { impl, calls } = fakeFetch([completion('{"answer":"ok","score":1}'), completion('{"answer":"x"}'), completion('{"answer":"fixed","score":0.5}'), completion('{"answer":"next","score":0.2}')]);
+    const p = new OpenAIProvider({ apiKey: 'k', kind: 'google', fetchImpl: impl });
+    expect((await call(p)).data.answer).toBe('ok');
+    expect(system(calls[0]!)).toContain('follows the response schema');
+    expect(system(calls[0]!)).not.toContain('"properties"');
+    // Invalid output: retried once with the full schema text, which then sticks.
+    expect((await call(p)).data.answer).toBe('fixed');
+    expect(system(calls[2]!)).toContain('"properties"');
+    await call(p);
+    expect(system(calls[3]!)).toContain('"properties"');
   });
 
   it('surfaces auth errors with the provider message and never retries modes on them', async () => {

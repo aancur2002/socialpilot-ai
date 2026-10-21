@@ -66,6 +66,7 @@ export class FailoverAIProvider implements AIProvider {
   private async run<T>(fn: (p: AIProvider) => Promise<T>): Promise<T & { provider: string }> {
     const order = this.order();
     let lastError: unknown;
+    let lastProvider: string | undefined;
     for (let n = 0; n < order.length; n++) {
       const i = order[n]!;
       const provider = this.chain[i]!;
@@ -75,6 +76,7 @@ export class FailoverAIProvider implements AIProvider {
         return { ...result, provider: provider.name };
       } catch (error) {
         lastError = error;
+        lastProvider = provider.name;
         if (!this.shouldFailOver(error)) throw error;
         const kind = error instanceof AiProviderError ? error.kind : 'invalid_output';
         const cooldown = error instanceof AiProviderError ? COOLDOWN_MS[error.kind] : undefined;
@@ -83,6 +85,8 @@ export class FailoverAIProvider implements AIProvider {
         this.onFailover?.({ from: provider.name, to: next, reason: `${kind}: ${error.message.slice(0, 200)}` });
       }
     }
+    // Tag which provider's error this is, for accurate logging upstream.
+    if (lastError instanceof Error && lastProvider) Object.assign(lastError, { provider: lastProvider });
     throw lastError;
   }
 

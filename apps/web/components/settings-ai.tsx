@@ -25,6 +25,7 @@ interface AiSettingsView {
   mockAllowed: boolean;
   suggestions: Record<'anthropic' | 'openai' | 'google' | 'nvidia' | 'meta', string[]> & { embeddings: Record<'openai' | 'google' | 'nvidia', string[]> };
   reindexRequired?: boolean;
+  reindexQueued?: number | null;
 }
 
 interface BackupRow {
@@ -131,7 +132,7 @@ export function AiModelSettings() {
       qc.setQueryData(['ai-settings'], d);
       setTest(null);
       setReindex(Boolean(d.reindexRequired));
-      toast.success('AI settings saved');
+      toast.success(d.reindexQueued ? `AI settings saved. Re-indexing ${d.reindexQueued} knowledge sources for the new embedding model; it takes a minute or two.` : 'AI settings saved');
     },
     onError: (e) => toast.error(errorMessage(e)),
   });

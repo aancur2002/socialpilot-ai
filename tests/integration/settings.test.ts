@@ -118,7 +118,14 @@ describe('account, knowledge editing and AI model settings', () => {
       expect(g.suggestions.google.length).toBeGreaterThan(0);
       const n = await core.updateAiSettings(owner.ctx, { provider: 'nvidia', apiKey: 'nvapi-test-key-0000', model: 'deepseek-ai/deepseek-r1', embeddingProvider: 'nvidia' });
       expect(n.effective).toMatchObject({ provider: 'nvidia', model: 'deepseek-ai/deepseek-r1', embeddingModel: 'nvidia/nv-embedqa-e5-v5' });
-      expect(n.reindexRequired).toBe(true);
+      // A new embedding model re-indexes knowledge automatically, after the worker's settings cache expires.
+      expect(n.reindexRequired).toBe(false);
+      expect(n.reindexQueued).toBeGreaterThanOrEqual(0);
+      const sources = await core.getInfra().db.knowledgeSource.findMany({ where: { organizationId: owner.organizationId }, select: { id: true } });
+      if (sources.length) {
+        const delayed = await core.getInfra().queues.get('knowledge').getDelayed();
+        expect(delayed.some((j) => sources.some((src) => src.id === (j.data as { sourceId: string }).sourceId) && j.opts.delay === 35_000)).toBe(true);
+      }
       core.clearAiCache(owner.organizationId);
       expect((await core.aiFor(owner.organizationId)).ai.name).toBe('nvidia');
       // Different embedding service without its own key is rejected.

@@ -288,7 +288,17 @@ export async function updateAiSettings(ctx: AuthContext, input: AiSettingsInput)
     after: { ...summary(next), apiKeyChanged: input.apiKey !== undefined, embeddingApiKeyChanged: input.embeddingApiKey !== undefined, backupKeysChanged: (input.fallbacks ?? []).filter((f) => f.apiKey !== undefined).map((f) => f.provider) },
   });
   const embeddingChanged = build(before).embeddings.model !== build(next).embeddings.model;
-  return { ...(await getAiSettings(ctx)), reindexRequired: embeddingChanged };
+  // Knowledge is searched only with vectors from the current embedding model, so a change makes
+  // it unsearchable until re-indexed. Re-index automatically, after the 30-second settings cache
+  // in other processes (the worker) has expired, so the new model is the one used.
+  let reindexQueued: number | null = null;
+  if (embeddingChanged) {
+    const { reindexAllKnowledge } = await import('./knowledge.service');
+    reindexQueued = await reindexAllKnowledge(ctx, undefined, { delayMs: 35_000 })
+      .then((r) => r.queued)
+      .catch(() => null);
+  }
+  return { ...(await getAiSettings(ctx)), reindexRequired: embeddingChanged && reindexQueued === null, reindexQueued };
 }
 
 const NON_TEXT_MODEL = /embed|tts|imagen|veo|image-generation|rerank|guard|aqa|audio|parse|clip|vila|muse-image|transcribe|^sam-/i;

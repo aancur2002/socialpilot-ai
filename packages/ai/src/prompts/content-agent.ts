@@ -1,6 +1,6 @@
 import { renderBrand, type BrandContext } from './shared';
 
-export const CONTENT_AGENT_VERSION = 'CONTENT_AGENT_V1';
+export const CONTENT_AGENT_VERSION = 'CONTENT_AGENT_V2';
 
 export interface ContentPromptInput {
   brand: BrandContext;

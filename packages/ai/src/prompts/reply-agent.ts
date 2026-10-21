@@ -1,7 +1,7 @@
 import { untrustedBlock } from '../injection';
 import { renderBrand, UNTRUSTED_CONTENT_RULES, type BrandContext } from './shared';
 
-export const REPLY_AGENT_VERSION = 'REPLY_AGENT_V1';
+export const REPLY_AGENT_VERSION = 'REPLY_AGENT_V2';
 
 export interface KnowledgeSnippet {
   id: string;

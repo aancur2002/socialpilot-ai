@@ -93,6 +93,12 @@ export const COMPATIBLE_PRESETS: Record<CompatibleProvider, Preset> = {
 
 type FetchImpl = typeof fetch;
 
+const SHORT_JSON_REMINDER = 'Respond with only a JSON object that follows the response schema. No prose, no code fences.';
+const addUsage = (a: { inputTokens?: number; outputTokens?: number }, b: { inputTokens?: number; outputTokens?: number }) => ({
+  inputTokens: (a.inputTokens ?? 0) + (b.inputTokens ?? 0) || undefined,
+  outputTokens: (a.outputTokens ?? 0) + (b.outputTokens ?? 0) || undefined,
+});
+
 /** Brief pause before retrying a temporary overload; honors Retry-After up to 5 seconds. */
 function retryDelayMs(res: Response): number {
   const header = Number(res.headers.get('retry-after'));
@@ -180,6 +186,8 @@ export class OpenAIProvider implements AIProvider {
   private readonly fetchImpl: FetchImpl;
   /** The structured-output mode this endpoint accepted last, so later calls skip failed modes. */
   private structuredMode: StructuredMode;
+  /** Set once json_schema output failed validation with only the short reminder. */
+  private schemaTextNeeded = false;
 
   constructor(private readonly config: OpenAIProviderConfig) {
     const kind = config.kind ?? 'openai';
@@ -238,17 +246,22 @@ export class OpenAIProvider implements AIProvider {
     const modes: StructuredMode[] =
       this.preset.structured === 'strict' ? ['json_schema'] : (['json_schema', 'json_object', 'prompt'] as StructuredMode[]).slice((['json_schema', 'json_object', 'prompt'] as StructuredMode[]).indexOf(this.structuredMode));
 
+    // When the endpoint enforces the schema (json_schema), repeating it as text only costs
+    // tokens (100-250 per call), so a one-line reminder is sent instead. If an endpoint's
+    // output still doesn't validate, the full schema text is used from then on.
+    const jsonSchemaExtra = () => (this.preset.structured === 'strict' ? undefined : this.schemaTextNeeded ? schemaInstruction : SHORT_JSON_REMINDER);
+    const run = (mode: StructuredMode) =>
+      mode === 'json_schema'
+        ? this.complete(input, { type: 'json_schema', json_schema: { name: input.schemaName, strict: true, schema } }, jsonSchemaExtra())
+        : mode === 'json_object'
+          ? this.complete(input, { type: 'json_object' }, schemaInstruction)
+          : this.complete(input, undefined, schemaInstruction);
+
     let result: Awaited<ReturnType<OpenAIProvider['complete']>> | undefined;
     let lastError: unknown;
     for (const mode of modes) {
       try {
-        if (mode === 'json_schema') {
-          result = await this.complete(input, { type: 'json_schema', json_schema: { name: input.schemaName, strict: true, schema } }, this.preset.structured === 'strict' ? undefined : schemaInstruction);
-        } else if (mode === 'json_object') {
-          result = await this.complete(input, { type: 'json_object' }, schemaInstruction);
-        } else {
-          result = await this.complete(input, undefined, schemaInstruction);
-        }
+        result = await run(mode);
         this.structuredMode = mode;
         break;
       } catch (error) {
@@ -259,20 +272,33 @@ export class OpenAIProvider implements AIProvider {
     }
     if (!result) throw lastError;
 
+    try {
+      return { data: this.parseStructured(input, result.text), model: result.model, usage: result.usage };
+    } catch (error) {
+      const shortened = this.structuredMode === 'json_schema' && this.preset.structured !== 'strict' && !this.schemaTextNeeded;
+      if (!(error instanceof AiOutputValidationError) || !shortened) throw error;
+      this.schemaTextNeeded = true;
+      const retry = await run('json_schema');
+      return { data: this.parseStructured(input, retry.text), model: retry.model, usage: addUsage(result.usage, retry.usage) };
+    }
+  }
+
+  private parseStructured<S extends z.ZodType>(input: GenerateStructuredInput<S>, text: string): z.infer<S> {
     let parsed: unknown;
     try {
-      parsed = this.structuredMode === 'json_schema' || this.structuredMode === 'json_object' ? JSON.parse(result.text) : extractJson(result.text);
+      parsed = this.structuredMode === 'json_schema' || this.structuredMode === 'json_object' ? JSON.parse(text) : extractJson(text);
     } catch {
       try {
-        parsed = extractJson(result.text);
+        parsed = extractJson(text);
       } catch {
-        throw new AiOutputValidationError(`${input.schemaName}: output was not valid JSON`, result.text);
+        throw new AiOutputValidationError(`${input.schemaName}: output was not valid JSON`, text);
       }
     }
     const validated = input.schema.safeParse(parsed);
-    if (!validated.success) throw new AiOutputValidationError(`${input.schemaName}: ${validated.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`, result.text);
-    return { data: validated.data, model: result.model, usage: result.usage };
+    if (!validated.success) throw new AiOutputValidationError(`${input.schemaName}: ${validated.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`, text);
+    return validated.data;
   }
+
 }
 
 /** Lists model IDs from an OpenAI-compatible /models endpoint (Gemini prefixes IDs with "models/"). */

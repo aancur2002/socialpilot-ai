@@ -94,12 +94,12 @@ export async function reprocessKnowledgeSource(ctx: AuthContext, id: string) {
 }
 
 /** Re-indexes every source the caller can manage — needed after changing the embedding model. */
-export async function reindexAllKnowledge(ctx: AuthContext, clientId?: string) {
+export async function reindexAllKnowledge(ctx: AuthContext, clientId?: string, opts: { delayMs?: number } = {}) {
   requirePermission(ctx, 'knowledge:manage');
   const { db, queues } = getInfra();
   const sources = await db.knowledgeSource.findMany({ where: tenantWhere(ctx, clientId), select: { id: true } });
   await db.knowledgeSource.updateMany({ where: { id: { in: sources.map((s) => s.id) } }, data: { status: 'PENDING', error: null } });
-  for (const s of sources) await queues.add('knowledge', { sourceId: s.id }, { attempts: 3, backoff: { type: 'exponential', delay: 5000 } });
+  for (const s of sources) await queues.add('knowledge', { sourceId: s.id }, { attempts: 3, backoff: { type: 'exponential', delay: 5000 }, ...(opts.delayMs ? { delay: opts.delayMs } : {}) });
   await audit(ctx, { action: 'knowledge.reindexed', resourceType: 'KnowledgeSource', clientId: clientId ?? null, after: { count: sources.length } });
   return { queued: sources.length };
 }

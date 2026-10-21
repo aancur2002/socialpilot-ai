@@ -7,6 +7,7 @@ import {
   IntentAgent,
   isWithinBusinessHours,
   LeadAgent,
+  selectKnowledge,
   ReplyAgent,
   type AutomationOverrides,
   type BusinessHoursConfig,
@@ -206,43 +207,46 @@ async function runPipeline(messageId: string, opts: { force?: boolean; requested
     return { decision: 'SKIPPED_SPAM', suggestionId: s.id, intent: 'SPAM', confidence: intent.confidence };
   }
 
-  // ── Lead detection ──
-  let leadId: string | undefined;
-  const forceLead = actions.some((a) => a.type === 'create_lead');
-  if (forceLead || intent.buyingSignal || LEAD_INTENTS.includes(intent.intent)) {
-    try {
-      const inbound = await db.message.findMany({ where: { conversationId: conversation.id, direction: 'INBOUND' }, orderBy: { createdAt: 'desc' }, take: 8 });
-      const lead = await new LeadAgent(ai, genLog).extract({
-        brandName: brand.brandName,
-        services: brand.services ?? [],
-        products: brand.products ?? [],
-        contactName: conversation.contact.name,
-        messages: inbound.reverse().map((m) => m.content),
-      });
-      if (forceLead || (lead.data.isLead && lead.data.confidence >= 0.6)) {
-        const res = await upsertDetectedLead({
-          organizationId: conversation.organizationId,
-          clientId: client.id,
-          conversationId: conversation.id,
-          contactId: conversation.contactId,
-          platform: account.platform,
-          intent: intent.intent,
-          confidence: lead.data.confidence,
-          name: lead.data.name ?? conversation.contact.name,
-          username: conversation.contact.username,
-          email: lead.data.email,
-          phone: lead.data.phone,
-          interest: lead.data.interest,
+  // ── Lead detection (runs alongside the reply draft; they don't depend on each other) ──
+  const leadTask = (async (): Promise<string | undefined> => {
+    const forceLead = actions.some((a) => a.type === 'create_lead');
+    if (forceLead || intent.buyingSignal || LEAD_INTENTS.includes(intent.intent)) {
+      try {
+        const inbound = await db.message.findMany({ where: { conversationId: conversation.id, direction: 'INBOUND' }, orderBy: { createdAt: 'desc' }, take: 8 });
+        const lead = await new LeadAgent(ai, genLog).extract({
+          brandName: brand.brandName,
+          services: brand.services ?? [],
+          products: brand.products ?? [],
+          contactName: conversation.contact.name,
+          messages: inbound.reverse().map((m) => m.content),
         });
-        leadId = res.leadId;
+        if (forceLead || (lead.data.isLead && lead.data.confidence >= 0.6)) {
+          const res = await upsertDetectedLead({
+            organizationId: conversation.organizationId,
+            clientId: client.id,
+            conversationId: conversation.id,
+            contactId: conversation.contactId,
+            platform: account.platform,
+            intent: intent.intent,
+            confidence: lead.data.confidence,
+            name: lead.data.name ?? conversation.contact.name,
+            username: conversation.contact.username,
+            email: lead.data.email,
+            phone: lead.data.phone,
+            interest: lead.data.interest,
+          });
+          return res.leadId;
+        }
+      } catch (error) {
+        log.warn({ error: error instanceof Error ? error.message : String(error) }, 'lead extraction failed; continuing');
       }
-    } catch (error) {
-      log.warn({ error: error instanceof Error ? error.message : String(error) }, 'lead extraction failed; continuing');
     }
-  }
+    return undefined;
+  })();
 
   // ── Knowledge + draft ──
-  const knowledge = await searchKnowledgeInternal(conversation.organizationId, client.id, message.content, 5);
+  // Only snippets close in relevance to the best match, within a size budget (fewer tokens, less to misquote).
+  const knowledge = selectKnowledge(await searchKnowledgeInternal(conversation.organizationId, client.id, message.content, 5));
   let reply: ReplyOutput;
   let generationId: string | undefined;
   try {
@@ -264,8 +268,9 @@ async function runPipeline(messageId: string, opts: { force?: boolean; requested
   } catch (error) {
     log.error({ error: error instanceof Error ? error.message : String(error) }, 'reply generation failed');
     await escalateConversation(ctx, conversation.id, { reason: 'AI could not draft a reply', intent: intent.intent, messageId });
-    return { decision: 'ESCALATED', intent: intent.intent, reasons: ['AI_ERROR'], leadId };
+    return { decision: 'ESCALATED', intent: intent.intent, reasons: ['AI_ERROR'], leadId: await leadTask };
   }
+  const leadId = await leadTask;
 
   const safety = checkReplySafety(reply.suggestedReply, {
     allowedDomains: [domainOf(brand.website)].filter((d): d is string => Boolean(d)),

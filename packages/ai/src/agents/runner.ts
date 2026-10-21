@@ -81,9 +81,11 @@ export async function runStructured<S extends z.ZodType>(
     } catch (error) {
       lastError = error;
       const isValidation = error instanceof AiOutputValidationError;
+      // After failover, record the provider whose error ended the attempt, not the chain's first name.
+      const failed = (error as { provider?: string }).provider;
       await log({
-        provider: provider.name,
-        model: provider.modelFor(call.tier ?? 'default'),
+        provider: failed ?? provider.name,
+        model: failed ? `${failed} (after failover)` : provider.modelFor(call.tier ?? 'default'),
         agent: call.agent,
         promptVersion: call.promptVersion,
         inputType: call.inputType,

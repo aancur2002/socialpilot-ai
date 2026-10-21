@@ -56,7 +56,7 @@ describe('webhooks, inbox and AI reply pipeline', () => {
     expect(s.suggestedReply).toContain('4.50');
     expect(s.knowledgeChunkIds.length).toBeGreaterThan(0);
     const gen = await db.aiGeneration.findFirst({ where: { clientId: setup.client.id, agent: 'ReplyAgent' } });
-    expect(gen).toMatchObject({ promptVersion: 'REPLY_AGENT_V1', provider: 'mock', status: 'SUCCESS' });
+    expect(gen).toMatchObject({ promptVersion: 'REPLY_AGENT_V2', provider: 'mock', status: 'SUCCESS' });
   });
 
   it('auto-sends when enabled, confident and the intent is allowed', async () => {
