@@ -152,3 +152,7 @@ tests/        Integration tests
 ## Status
 
 The product runs end to end with mock platform accounts. The real platform adapters follow each platform's documented API but haven't been verified against live accounts yet; that needs approved developer apps (for Meta, App Review). See [BUILD_STATUS.md](BUILD_STATUS.md).
+
+## License
+
+Copyright © 2026 Anup Ghimire. All rights reserved. The source is shared for viewing and evaluation only; see [LICENSE](LICENSE).
