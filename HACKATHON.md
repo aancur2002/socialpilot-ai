@@ -1,5 +1,37 @@
 # SocialPilot AI for the Meta Global AI Developer Hackathon
 
+## The event
+
+[Meta Global AI Developer Hackathon](https://cerebralvalley.ai/e/meta-ai-developer-hackathon), virtual and worldwide. Repository: [github.com/aancur2002/socialpilot-ai](https://github.com/aancur2002/socialpilot-ai).
+
+| Date (US Eastern) | What happens |
+|---|---|
+| **Oct 25, 11:59 PM** | Applications close (earlier if 20,000 places fill; reviewed on a rolling basis) |
+| Oct 26 | Acceptances, kickoff livestream, **official rules published** |
+| Oct 27 – Nov 4 | Workshops and Discord office hours |
+| **Nov 4, 9:00 PM** | **Submissions due** |
+| Nov 4 – 8 | Judging |
+| Nov 9 | Finals and winners |
+
+- **Track: Startup** ("technical execution and whether it holds up in production"). Theme: **Build for Your World**.
+- Applications are scored equally on the project idea and technical skill.
+- Models named by the event: Muse Spark, Muse Wonder, Muse Image, SAM 3.1 (Meta Model API), and Meta open-weights models through partner credits (Baseten, Modal, Fireworks).
+
+### Application answer (draft)
+
+> SocialPilot AI lets one person run social media for dozens of local businesses. Meta's Muse Spark writes each client's posts in their own voice, triages every comment and DM on Facebook, Instagram and WhatsApp, drafts replies grounded in that business's own facts with a confidence score, and turns buying intent into CRM leads. Muse Image creates the post visuals. Anything uncertain, sensitive or risky goes to a person instead of being auto-sent. It's a working multi-tenant SaaS with approvals, scheduled publishing, lead-capture forms, billing and a production Docker deployment. During the hackathon I'll add Muse Voice Transcribe for WhatsApp voice notes and SAM 3.1 for product cutouts, and harden it on Meta's newest models.
+
+### If the rules only allow work done during the event
+
+State clearly that SocialPilot is the pre-existing base (commits before Oct 26 are visible in the history), and submit the new work built Oct 26 – Nov 4:
+
+- **Muse Voice Transcribe**: WhatsApp voice notes go through the same triage, reply and lead flow as text.
+- **SAM 3.1**: cut products out of client photos for clean post images.
+- **Meta open-weights backup** through a partner's credits, so a customer's data can stay on infrastructure you control.
+- Built with **Muse Code**; say so in the write-up.
+
+Tag the starting point so judges can see exactly what's new: `git tag hackathon-start` on Oct 26 before building, then link the comparison (`/compare/hackathon-start...main`) in the submission.
+
 ## The pitch
 
 **SocialPilot AI runs the social media of small businesses on Meta's own stack: Meta's Muse Spark models write the posts and answer the customers, and Meta's platforms (Facebook, Instagram, WhatsApp) are where they go.**
@@ -47,7 +79,8 @@ Record with mock social accounts unless your Meta app has passed App Review. Say
 
 ## Before you submit
 
-- [ ] The rules are published when applications open: read them, especially model-use and repository requirements.
+- [ ] Apply before **Oct 25, 11:59 PM ET** (Startup track, GitHub link).
+- [ ] Read the official rules on Oct 26: pre-existing code, repository visibility, license, video length.
 - [ ] `.env` and any keys are **not** in the repository (`git log -p | grep -i "api_key"` returns nothing real).
 - [x] The README opens with the pitch and screenshots.
 - [ ] Meta billing is active on your developer account (the key currently returns HTTP 402), then **Test connection** shows Meta as OK and **Generate image** produces a real picture.

@@ -1,5 +1,7 @@
 # SocialPilot AI
 
+[![CI](https://github.com/aancur2002/socialpilot-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/aancur2002/socialpilot-ai/actions/workflows/ci.yml)
+
 **Every client's social media, run from one board.** SocialPilot is a multi-tenant SaaS for agencies and small businesses. It drafts posts, gets them approved, publishes on schedule, answers comments and messages, and turns interest into leads. The AI (Meta's **Muse Spark**) does the first draft of everything; people stay in charge of what goes out.
 
 ![SocialPilot home page](docs/screenshots/landing.png)
@@ -79,6 +81,7 @@ flowchart LR
 Requirements: Node.js 22+, npm 10+ and Docker.
 
 ```bash
+git clone https://github.com/aancur2002/socialpilot-ai.git && cd socialpilot-ai
 npm install
 cp env.example .env        # then set ENCRYPTION_KEY and JWT_SECRET (commands are in the file)
 npm run infra:up           # Postgres (pgvector) on :5434, Redis on :6380

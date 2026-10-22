@@ -16,6 +16,9 @@ next-env.d.ts
 .data/
 /storage/
 
+# production backups (database dumps) — never commit
+backups/
+
 # test artifacts
 playwright-report/
 test-results/

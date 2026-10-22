@@ -1,6 +1,16 @@
 {
   "name": "socialpilot-ai",
   "version": "0.1.0",
+  "description": "Multi-tenant social media management SaaS for agencies, built on Meta Muse Spark and Muse Image.",
+  "homepage": "https://github.com/aancur2002/socialpilot-ai#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aancur2002/socialpilot-ai.git"
+  },
+  "bugs": {
+    "url": "https://github.com/aancur2002/socialpilot-ai/issues"
+  },
+  "author": "aancur2002 (https://github.com/aancur2002)",
   "private": true,
   "type": "module",
   "packageManager": "npm@11.16.0",
