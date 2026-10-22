@@ -9,10 +9,10 @@
 | `anthropic` | Official `@anthropic-ai/sdk`, structured outputs (`output_config.format` with a JSON schema) | Default model `claude-opus-5`. Override with `AI_MODEL` or `AI_FAST_MODEL`, for example `AI_FAST_MODEL=claude-haiku-4-5` to cut the cost of intent classification. Server-side refusal fallbacks are enabled (`fallbacks: "default"`). A refusal escalates the conversation to a person. |
 | `openai` | OpenAI-compatible chat completions with strict `json_schema` | `OPENAI_BASE_URL` points at compatible gateways |
 | `google` | Gemini through Google's OpenAI-compatible endpoint | Free tier (key from aistudio.google.com). Default `gemini-3.8-flash`, fast `gemini-3.1-flash-lite` (Gemini 2.5 is limited to legacy projects and returns 404 for new keys) |
-| `nvidia` | NVIDIA NIM (build.nvidia.com), OpenAI-compatible | Free credits. Default `meta/llama-3.3-70b-instruct`, fast `meta/llama-3.1-8b-instruct`; any NIM model ID works |
+| `nvidia` | NVIDIA NIM (build.nvidia.com), OpenAI-compatible | Free credits. Default `nvidia/nemotron-3.5-lightning-30b-a3b`, fast `nvidia/nemotron-3.5-lightning-30b-a3b`; any NIM model ID works |
 | `mock` | Deterministic heuristics, fully offline | Used by the tests, the seed and development without keys. Refused in production. |
 
-Embeddings: `openai` (`text-embedding-3-small`), `google` (`gemini-embedding-001`, requested at 1536 dimensions), `nvidia` (`nvidia/nv-embedqa-e5-v5`, 1024 dimensions, sent with `input_type` query/passage) or `mock`, a local feature-hashing embedder that captures word overlap only. Anthropic has no embeddings endpoint. For real semantic search in production, set `EMBEDDING_PROVIDER=openai`. Chunks record which embedding model produced them, and search only compares vectors from the same model. After switching models, re-process the knowledge sources.
+Embeddings: `openai` (`text-embedding-3-small`), `google` (`gemini-embedding-001`, requested at 1536 dimensions), `nvidia` (`nvidia/nemotron-3-embed-1b`, 1024 dimensions, sent with `input_type` query/passage) or `mock`, a local feature-hashing embedder that captures word overlap only. Anthropic has no embeddings endpoint. For real semantic search in production, set `EMBEDDING_PROVIDER=openai`. Chunks record which embedding model produced them, and search only compares vectors from the same model. After switching models, re-process the knowledge sources.
 
 ### Backup providers (failover)
 

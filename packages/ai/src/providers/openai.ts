@@ -67,9 +67,10 @@ export const COMPATIBLE_PRESETS: Record<CompatibleProvider, Preset> = {
   nvidia: {
     label: 'NVIDIA NIM',
     baseUrl: 'https://integrate.api.nvidia.com/v1',
-    model: 'meta/llama-3.3-70b-instruct',
-    fastModel: 'meta/llama-3.1-8b-instruct',
-    embeddingModel: 'nvidia/nv-embedqa-e5-v5',
+    // Non-reasoning (fast, few output tokens). The Llama 3.x NIMs were retired on 2026-08-26.
+    model: 'nvidia/nemotron-3.5-lightning-30b-a3b',
+    fastModel: 'nvidia/nemotron-3.5-lightning-30b-a3b',
+    embeddingModel: 'nvidia/nemotron-3-embed-1b',
     maxTokensParam: 'max_tokens',
     structured: 'negotiate',
     embeddingDimensionsParam: false,

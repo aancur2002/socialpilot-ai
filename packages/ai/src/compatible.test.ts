@@ -118,7 +118,7 @@ describe('OpenAI-compatible providers', () => {
   });
 
   it('uses preset models, custom models, and the main model as fast model when only main is set', () => {
-    expect(new OpenAIProvider({ apiKey: 'k', kind: 'nvidia' }).modelFor('fast')).toBe('meta/llama-3.1-8b-instruct');
+    expect(new OpenAIProvider({ apiKey: 'k', kind: 'nvidia' }).modelFor('fast')).toBe('nvidia/nemotron-3.5-lightning-30b-a3b');
     const custom = new OpenAIProvider({ apiKey: 'k', kind: 'nvidia', model: 'deepseek-ai/deepseek-r1' });
     expect(custom.modelFor('default')).toBe('deepseek-ai/deepseek-r1');
     expect(custom.modelFor('fast')).toBe('deepseek-ai/deepseek-r1');
@@ -160,7 +160,7 @@ describe('OpenAI-compatible providers', () => {
 
   it('factory builds Google and NVIDIA providers', () => {
     expect(createAIProvider({ provider: 'google', apiKey: 'k', embeddingProvider: 'mock' }).name).toBe('google');
-    expect(createEmbeddingProvider({ provider: 'nvidia', apiKey: 'k', embeddingProvider: 'nvidia' }).model).toBe('nvidia/nv-embedqa-e5-v5');
+    expect(createEmbeddingProvider({ provider: 'nvidia', apiKey: 'k', embeddingProvider: 'nvidia' }).model).toBe('nvidia/nemotron-3-embed-1b');
     expect(() => createEmbeddingProvider({ provider: 'anthropic', apiKey: 'k', embeddingProvider: 'google' })).toThrow(/EMBEDDING_API_KEY/);
   });
 });
@@ -193,7 +193,7 @@ describe('embedding dimensions', () => {
     const [doc] = await e.generateEmbeddings(['passage text'], 'document');
     await e.generateEmbeddings(['question?'], 'query');
     expect(doc).toHaveLength(1536);
-    expect(calls[0]!.body).toMatchObject({ input_type: 'passage', model: 'nvidia/nv-embedqa-e5-v5' });
+    expect(calls[0]!.body).toMatchObject({ input_type: 'passage', model: 'nvidia/nemotron-3-embed-1b' });
     expect(calls[1]!.body).toMatchObject({ input_type: 'query' });
     expect(calls[0]!.body.dimensions).toBeUndefined();
   });

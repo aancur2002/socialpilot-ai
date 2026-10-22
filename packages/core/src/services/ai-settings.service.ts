@@ -14,13 +14,14 @@ export const MODEL_SUGGESTIONS = {
   openai: ['gpt-4.1', 'gpt-4.1-mini'],
   // Providers rename models often: these are starting points, any model ID can be typed.
   google: ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite', 'gemini-3.1-pro-preview'],
-  nvidia: ['meta/llama-3.3-70b-instruct', 'meta/llama-3.1-8b-instruct', 'nvidia/llama-3.3-nemotron-super-49b-v1', 'deepseek-ai/deepseek-r1', 'qwen/qwen2.5-coder-32b-instruct'],
+  // NVIDIA retires models often (the Llama 3.x NIMs ended 2026-08-26) and access varies by key: use "Load models" for the live list.
+  nvidia: ['nvidia/nemotron-3.5-lightning-30b-a3b'],
   // Meta Model API (Muse Spark). The -contributor versions are discounted.
   meta: ['muse-spark-1.3', 'muse-spark-1.2', 'muse-spark-1.1', 'muse-spark-1.3-contributor', 'muse-spark-1.2-contributor'],
   embeddings: {
     openai: ['text-embedding-3-small'],
     google: ['gemini-embedding-001', 'gemini-embedding-2-preview'],
-    nvidia: ['nvidia/nv-embedqa-e5-v5', 'nvidia/llama-3.2-nv-embedqa-1b-v2'],
+    nvidia: ['nvidia/nemotron-3-embed-1b', 'nvidia/nemotron-3.5-embed-1b'],
   },
 } as const;
 

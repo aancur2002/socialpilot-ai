@@ -1,5 +1,7 @@
 # SocialPilot AI for the Meta Global AI Developer Hackathon
 
+Submission text and a timed narration script: [SUBMISSION.md](SUBMISSION.md).
+
 ## The event
 
 [Meta Global AI Developer Hackathon](https://cerebralvalley.ai/e/meta-ai-developer-hackathon), virtual and worldwide. Repository: [github.com/aancur2002/socialpilot-ai](https://github.com/aancur2002/socialpilot-ai).
@@ -59,7 +61,7 @@ Images cost $0.01 each and count toward the plan's monthly AI allowance, like te
 ## Setup with a Meta key (about 5 minutes)
 
 1. Get a key at [dev.meta.ai](https://dev.meta.ai/docs). The hackathon includes $150 of credits.
-2. Start the app (see `HOW_TO_USE.md`), sign in as `owner@demo.local`.
+2. Run `npm run demo:reset` (fresh demo data, keeps your saved AI keys), then `npm run demo` (starts the app with simulated social accounts), and sign in as `owner@demo.local`.
 3. **Settings → AI models**:
    - Provider: **Meta Model API (Muse Spark)**, paste the key, model `muse-spark-1.3`.
    - Knowledge search: **Google Gemini embeddings** with your Gemini key.

@@ -90,6 +90,8 @@ npm run db:seed            # demo agency, 3 clients, mock accounts, posts, conve
 npm run dev                # web :3000, API :4000, worker
 ```
 
+For a demo with simulated social accounts (no `.env` change needed): `npm run demo`. To get fresh demo data while keeping the AI keys saved in Settings: `npm run demo:reset`.
+
 Open http://localhost:3000. Every demo user's password is `demo-password-2026`:
 
 | User | Role |

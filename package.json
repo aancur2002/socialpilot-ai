@@ -24,6 +24,7 @@
   ],
   "scripts": {
     "dev": "turbo run dev --parallel",
+    "demo": "SOCIAL_MOCK_MODE=true turbo run dev --parallel --env-mode=loose",
     "build": "turbo run build",
     "typecheck": "turbo run typecheck",
     "lint": "eslint . --max-warnings=0",
@@ -35,6 +36,7 @@
     "db:migrate": "npm run migrate:dev --workspace @socialpilot/database",
     "db:deploy": "npm run migrate:deploy --workspace @socialpilot/database",
     "db:seed": "tsx packages/core/scripts/seed.ts",
+    "demo:reset": "tsx packages/core/scripts/demo-reset.ts",
     "platform-admin": "tsx packages/core/scripts/platform-admin.ts",
     "db:reset": "npm run reset --workspace @socialpilot/database",
     "infra:up": "docker compose up -d postgres redis",

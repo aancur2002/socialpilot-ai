@@ -117,7 +117,7 @@ describe('account, knowledge editing and AI model settings', () => {
       expect(g.effective).toMatchObject({ provider: 'google', model: 'gemini-3.8-flash', fastModel: 'gemini-3.1-flash-lite', embeddingProvider: 'google', embeddingModel: 'gemini-embedding-001', apiKeySource: 'organization' });
       expect(g.suggestions.google.length).toBeGreaterThan(0);
       const n = await core.updateAiSettings(owner.ctx, { provider: 'nvidia', apiKey: 'nvapi-test-key-0000', model: 'deepseek-ai/deepseek-r1', embeddingProvider: 'nvidia' });
-      expect(n.effective).toMatchObject({ provider: 'nvidia', model: 'deepseek-ai/deepseek-r1', embeddingModel: 'nvidia/nv-embedqa-e5-v5' });
+      expect(n.effective).toMatchObject({ provider: 'nvidia', model: 'deepseek-ai/deepseek-r1', embeddingModel: 'nvidia/nemotron-3-embed-1b' });
       // A new embedding model re-indexes knowledge automatically, after the worker's settings cache expires.
       expect(n.reindexRequired).toBe(false);
       expect(n.reindexQueued).toBeGreaterThanOrEqual(0);
