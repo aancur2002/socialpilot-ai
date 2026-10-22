@@ -48,6 +48,22 @@ describe('webhooks, inbox and AI reply pipeline', () => {
     expect(await db.message.count({ where: { platformMessageId: 'dup-1' } })).toBe(1);
   });
 
+  it('spends no AI on "thanks" or emoji-only messages, but still answers questions', async () => {
+    const before = await db.aiGeneration.count({ where: { clientId: setup.client.id } });
+    const thanks = (await send('Thanks so much! 🙏', 'grateful-user')).result;
+    expect(thanks).toMatchObject({ decision: 'SKIPPED_NO_REPLY_NEEDED', intent: 'OTHER' });
+    const emoji = (await send('👍👍', 'emoji-user')).result;
+    expect(emoji.decision).toBe('SKIPPED_NO_REPLY_NEEDED');
+    expect(await db.aiGeneration.count({ where: { clientId: setup.client.id } })).toBe(before);
+    const s = await db.aiReplySuggestion.findUniqueOrThrow({ where: { id: thanks.suggestionId! } });
+    expect(s).toMatchObject({ decision: 'SKIPPED', reason: 'Acknowledgement' });
+    // The conversation still shows as unread for the team.
+    const msg = await db.message.findFirstOrThrow({ where: { content: 'Thanks so much! 🙏' }, include: { conversation: true } });
+    expect(msg.conversation.unreadCount).toBeGreaterThan(0);
+    // A question with thanks in it still goes to the AI.
+    expect((await send('Thanks! Are you open on Sunday?', 'grateful-user')).result.decision).not.toBe('SKIPPED_NO_REPLY_NEEDED');
+  });
+
   it('answers from the knowledge base, holds for approval by default and detects a lead', async () => {
     const { result } = await send('How much does a sourdough loaf cost?');
     expect(result).toMatchObject({ decision: 'PENDING_APPROVAL', intent: 'PRICE' });

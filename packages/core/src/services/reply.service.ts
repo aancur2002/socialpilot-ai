@@ -7,6 +7,7 @@ import {
   IntentAgent,
   isWithinBusinessHours,
   LeadAgent,
+  noReplyNeeded,
   selectKnowledge,
   ReplyAgent,
   type AutomationOverrides,
@@ -36,7 +37,7 @@ const RECENT_WINDOW = 10;
 const SUMMARY_EVERY = 20;
 
 export interface PipelineResult {
-  decision: ReplyDecision | 'SKIPPED_SPAM' | 'SKIPPED_AI_DISABLED' | 'SKIPPED_ACCOUNT_BLOCKED' | 'ALREADY_PROCESSED' | 'NOT_INBOUND';
+  decision: ReplyDecision | 'SKIPPED_SPAM' | 'SKIPPED_AI_DISABLED' | 'SKIPPED_ACCOUNT_BLOCKED' | 'SKIPPED_NO_REPLY_NEEDED' | 'ALREADY_PROCESSED' | 'NOT_INBOUND';
   suggestionId?: string;
   intent?: Intent;
   confidence?: number;
@@ -141,6 +142,20 @@ async function runPipeline(messageId: string, opts: { force?: boolean; requested
   if (!settings.aiEnabled) return { decision: 'SKIPPED_AI_DISABLED' };
   // Blocked customers keep receiving messages, but no AI credits are spent on them.
   if ((await organizationAccess(conversation.organizationId)).state === 'blocked') return { decision: 'SKIPPED_ACCOUNT_BLOCKED' };
+  // "Thanks", "ok", emoji-only: nothing to answer, so no AI is spent. The message stays unread for the team.
+  const noReply = opts.force ? null : noReplyNeeded(message.content);
+  if (noReply) {
+    await db.message.update({ where: { id: messageId }, data: { intent: 'OTHER', confidence: 1 } });
+    const s = await db.aiReplySuggestion.create({
+      data: {
+        organizationId: conversation.organizationId, clientId: client.id, conversationId: conversation.id, inboundMessageId: messageId,
+        suggestedReply: '', intent: 'OTHER', confidence: 1, requiresHuman: false,
+        reason: noReply === 'emoji_only' ? 'Emoji reaction' : 'Acknowledgement',
+        decision: 'SKIPPED', decisionReason: 'No reply needed, so no AI was used',
+      },
+    });
+    return { decision: 'SKIPPED_NO_REPLY_NEEDED', suggestionId: s.id, intent: 'OTHER', confidence: 1 };
+  }
   const genLog = generationLogger({ organizationId: conversation.organizationId, clientId: client.id, userId: opts.requestedBy?.userId });
   const brand = brandContext(client.brandProfile, client.name);
   const channel = conversation.type === 'COMMENT' ? 'COMMENT' : 'DIRECT_MESSAGE';

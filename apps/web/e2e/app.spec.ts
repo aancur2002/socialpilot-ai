@@ -59,8 +59,9 @@ test('new agency: register, onboard a client, connect a mock account, generate, 
   await expect(page.getByText('Our new autumn pastry menu').first()).toBeVisible();
 });
 
-test('inbox: a simulated customer message gets an AI draft that a person sends', async ({ page, request }) => {
+test('inbox: a simulated customer message gets an AI draft that a person sends (or the AI sends it, if the client allows)', async ({ page, request }) => {
   test.skip(!(await serverMockMode(request)), 'Needs the server running with SOCIAL_MOCK_MODE=true');
+  test.setTimeout(180_000);
   await signIn(page, 'owner@demo.local');
   await page.goto('/inbox');
   await page.getByRole('button', { name: 'Simulate message' }).click();
@@ -76,8 +77,15 @@ test('inbox: a simulated customer message gets an AI draft that a person sends',
   const row = page.locator('section[aria-label="Conversations"] li', { hasText: name });
   await expect(row).toBeVisible({ timeout: 30_000 });
   await row.getByRole('button').click();
-  // Real AI providers take 15-30 seconds for triage, lead extraction and the draft; the mock is instant.
-  await expect(page.getByLabel('Reply')).not.toHaveValue('', { timeout: 60_000 });
+  // Real AI providers take 15-90 seconds (slower when a backup provider answers); the mock is instant.
+  // Depending on the client's auto-reply rules and the model's confidence, the reply is either held
+  // as a draft for a person or sent automatically. Both are correct outcomes.
+  const draft = page.getByLabel('Reply');
+  const autoSent = page.getByText('Sent automatically by AI');
+  await expect(async () => {
+    expect((await autoSent.count()) > 0 || (await draft.inputValue()) !== '').toBe(true);
+  }).toPass({ timeout: 120_000, intervals: [2_000] });
+  if (await autoSent.count()) return;
   await page.getByRole('button', { name: 'Send', exact: true }).click();
   await expect(page.getByText('Sent by your team')).toBeVisible();
 });

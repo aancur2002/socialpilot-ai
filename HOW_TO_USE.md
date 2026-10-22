@@ -123,6 +123,7 @@ To test failure handling in mock mode, put one of these in a caption: `[mock:fai
 ### 4.6 Inbox and AI replies
 **Inbox** collects messages and comments from every connected account.
 - In mock mode, **Simulate message** sends a test customer message. Pick a mock account, type a message and send.
+- Short acknowledgements ("thanks", "ok", "got it") and emoji-only reactions skip the AI entirely, which saves credits. They still show as unread so someone can see them.
 - The AI handles each message:
   - Answered from the knowledge base with high confidence → **sent automatically**, if the client allows it.
   - Less certain → **held for approval**. Open the conversation, check the AI suggestion (it shows its confidence and why it wasn't sent), edit if needed, and click **Send**.
