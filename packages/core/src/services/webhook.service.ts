@@ -1,10 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { isUniqueViolation, type Platform, type Prisma } from '@socialpilot/database';
-import { signMockWebhook, type MockWebhookPayload, type NormalizedWebhookEvent, type PlatformKey, type WebhookRequest } from '@socialpilot/social';
+import { signMockWebhook, type MessageAttachment, type MockWebhookPayload, type NormalizedWebhookEvent, type PlatformKey, type WebhookRequest } from '@socialpilot/social';
 import { requirePermission, tenantWhere, type AuthContext } from '../context';
 import { AppError, badRequest, notFound } from '../errors';
 import { getInfra, mockWebhookSecret } from '../infra';
+import { MAX_VOICE_NOTE_BYTES } from '../lib/audio';
 import { ingestNormalizedEvent } from './inbox.service';
+import { uploadMedia } from './media.service';
 import { getSocial } from './platform-credentials.service';
 
 export interface WebhookReceipt {
@@ -103,7 +105,7 @@ function reviveDates(event: NormalizedWebhookEvent): NormalizedWebhookEvent {
  */
 export async function simulateInbound(
   ctx: AuthContext,
-  input: { socialAccountId: string; type: 'message' | 'comment'; text: string; fromName?: string; fromId?: string; postId?: string },
+  input: { socialAccountId: string; type: 'message' | 'comment'; text: string; fromName?: string; fromId?: string; postId?: string; attachments?: MessageAttachment[] },
 ) {
   requirePermission(ctx, 'messages:view');
   const { db, env, social } = getInfra();
@@ -118,10 +120,27 @@ export async function simulateInbound(
     events: [
       input.type === 'comment'
         ? { type: 'comment', id, accountId: account.platformAccountId, postId: input.postId ?? `mock_post_${account.id.slice(-6)}`, from, text: input.text }
-        : { type: 'message', id, accountId: account.platformAccountId, from, text: input.text },
+        : { type: 'message', id, accountId: account.platformAccountId, from, text: input.text, attachments: input.attachments },
     ],
   };
   const rawBody = Buffer.from(JSON.stringify(payload));
   const receipt = await receiveWebhook(account.platform, { rawBody, headers: { 'x-mock-signature': signMockWebhook(mockWebhookSecret(env), rawBody) }, query: {} }, true);
   return { ...receipt, simulatedEventId: id, fromId };
+}
+
+/**
+ * Development helper: a customer sends a voice note to a Mock* account. The audio is
+ * stored like an upload and arrives as a message with no text, so the reply pipeline
+ * transcribes it before answering.
+ */
+export async function simulateVoiceNote(ctx: AuthContext, input: { socialAccountId: string; fromName?: string; fromId?: string; fileName: string; declaredMime: string; data: Buffer }) {
+  requirePermission(ctx, 'messages:view');
+  const { db } = getInfra();
+  const account = await db.socialAccount.findFirst({ where: { id: input.socialAccountId, ...tenantWhere(ctx) } });
+  if (!account) throw notFound('Social account');
+  if (!account.isMock) throw badRequest('Inbound simulation is only available for mock accounts');
+  if (input.data.length > MAX_VOICE_NOTE_BYTES) throw badRequest('Voice notes can be up to 32 MB');
+  const media = await uploadMedia(ctx, { clientId: account.clientId, fileName: input.fileName, declaredMime: input.declaredMime, data: input.data });
+  if (media.kind !== 'AUDIO') throw badRequest('Attach an audio file (WAV, OGG, MP3, M4A or WebM)');
+  return simulateInbound(ctx, { socialAccountId: account.id, type: 'message', text: '', fromName: input.fromName, fromId: input.fromId, attachments: [{ type: 'audio', mediaAssetId: media.id, mimeType: media.mimeType }] });
 }

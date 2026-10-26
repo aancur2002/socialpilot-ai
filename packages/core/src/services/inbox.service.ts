@@ -1,5 +1,5 @@
 import type { ConversationStatus, Platform, Prisma, Priority, SenderType } from '@socialpilot/database';
-import { getPlatformCapabilities, isSocialApiError, type NormalizedWebhookEvent } from '@socialpilot/social';
+import { getPlatformCapabilities, isSocialApiError, type MessageAttachment, type NormalizedWebhookEvent } from '@socialpilot/social';
 import { requirePermission, tenantWhere, type AuthContext, type ServiceContext } from '../context';
 import { AppError, badRequest, notFound } from '../errors';
 import { getInfra } from '../infra';
@@ -70,7 +70,7 @@ export async function ingestNormalizedEvent(socialAccountId: string, event: Norm
         senderType: outbound ? 'USER' : 'CONTACT',
         platformMessageId,
         content: text,
-        attachments: (isComment ? [] : event.message.attachments) as Prisma.InputJsonValue,
+        attachments: (isComment ? [] : event.message.attachments) as unknown as Prisma.InputJsonValue,
         status: outbound ? 'SENT' : 'RECEIVED',
         sentAt: outbound ? createdAt : null,
         createdAt,
@@ -99,7 +99,7 @@ export async function ingestNormalizedEvent(socialAccountId: string, event: Norm
       where: { id: conversation.id },
       data: {
         lastMessageAt: createdAt > conversation.lastMessageAt ? createdAt : conversation.lastMessageAt,
-        lastMessagePreview: truncate(text, 160),
+        lastMessagePreview: truncate(text || (!isComment && event.message.attachments.some((a) => a.type === 'audio') ? 'Voice note' : text), 160),
         ...(outbound ? {} : { unreadCount: { increment: 1 }, ...(conversation.status === 'RESOLVED' ? { status: 'OPEN' as const } : {}) }),
       },
     });
@@ -161,7 +161,7 @@ export async function getConversation(ctx: ServiceContext, id: string, opts: { m
   const { db } = getInfra();
   await loadConversation(ctx, id);
   if (opts.markRead) await db.conversation.update({ where: { id }, data: { unreadCount: 0 } });
-  return db.conversation.findUniqueOrThrow({
+  const conversation = await db.conversation.findUniqueOrThrow({
     where: { id },
     include: {
       contact: true,
@@ -173,6 +173,17 @@ export async function getConversation(ctx: ServiceContext, id: string, opts: { m
       leads: { orderBy: { createdAt: 'desc' }, take: 5 },
     },
   });
+  // Voice notes and photos we stored: add their playable URL.
+  const assetIds = conversation.messages.flatMap((m) => (Array.isArray(m.attachments) ? (m.attachments as unknown as MessageAttachment[]).flatMap((a) => (a?.mediaAssetId ? [a.mediaAssetId] : [])) : []));
+  if (!assetIds.length) return conversation;
+  const assets = await db.mediaAsset.findMany({ where: { id: { in: assetIds }, organizationId: conversation.organizationId }, select: { id: true, url: true } });
+  const urls = new Map(assets.map((a) => [a.id, a.url]));
+  return {
+    ...conversation,
+    messages: conversation.messages.map((m) =>
+      Array.isArray(m.attachments) ? { ...m, attachments: (m.attachments as unknown as MessageAttachment[]).map((a) => (a?.mediaAssetId && urls.has(a.mediaAssetId) ? { ...a, url: urls.get(a.mediaAssetId) } : a)) as unknown as typeof m.attachments } : m,
+    ),
+  };
 }
 
 // ── Replies ─────────────────────────────────────────────────────────────

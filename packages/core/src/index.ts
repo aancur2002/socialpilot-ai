@@ -26,6 +26,7 @@ export * from './services/webhook.service';
 export * from './services/inbox.service';
 export * from './services/lead.service';
 export * from './services/reply.service';
+export * from './services/voice.service';
 export * from './services/analytics.service';
 export * from './services/admin.service';
 export * from './services/platform-credentials.service';

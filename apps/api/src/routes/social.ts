@@ -1,4 +1,5 @@
 import * as core from '@socialpilot/core';
+import { AppError } from '@socialpilot/core';
 import { platformSchema, startOAuthSchema, connectMockSchema, PLATFORMS } from '@socialpilot/validation';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
@@ -67,6 +68,19 @@ export async function socialRoutes(app: FastifyInstance) {
       req.body,
     );
     return core.simulateInbound(await requireCtx(req), body);
+  });
+
+  app.post('/dev/simulate-voice-note', { config: { rateLimit: { max: 20, timeWindow: '1 minute' } }, schema: { tags: ['dev'], consumes: ['multipart/form-data'] } }, async (req) => {
+    const ctx = await requireCtx(req);
+    const file = await req.file();
+    if (!file) throw new AppError('BAD_REQUEST', 'Attach the recording in the "audio" field');
+    const fields = file.fields as Record<string, { value?: unknown } | undefined>;
+    const socialAccountId = parse(z.string().min(1).max(64), fields.socialAccountId?.value);
+    const fromName = parse(z.string().max(100).optional(), fields.fromName?.value || undefined);
+    const fromId = parse(z.string().max(100).optional(), fields.fromId?.value || undefined);
+    const data = await file.toBuffer();
+    if (file.file.truncated) throw new AppError('BAD_REQUEST', 'The recording exceeds the upload limit');
+    return core.simulateVoiceNote(ctx, { socialAccountId, fromName, fromId, fileName: file.filename || 'voice-note.wav', declaredMime: file.mimetype, data });
   });
 }
 

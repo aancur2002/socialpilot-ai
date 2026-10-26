@@ -4,7 +4,7 @@
  */
 export interface MediaInfo {
   mimeType: string;
-  kind: 'IMAGE' | 'VIDEO' | 'DOCUMENT';
+  kind: 'IMAGE' | 'VIDEO' | 'DOCUMENT' | 'AUDIO';
   width?: number;
   height?: number;
 }
@@ -17,9 +17,12 @@ export function sniffMime(buf: Buffer): string | null {
   if (startsWith(buf, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) return 'image/png';
   if (buf.toString('ascii', 0, 6) === 'GIF87a' || buf.toString('ascii', 0, 6) === 'GIF89a') return 'image/gif';
   if (buf.toString('ascii', 0, 4) === 'RIFF' && buf.toString('ascii', 8, 12) === 'WEBP') return 'image/webp';
+  if (buf.toString('ascii', 0, 4) === 'RIFF' && buf.toString('ascii', 8, 12) === 'WAVE') return 'audio/wav';
+  if (buf.toString('ascii', 0, 4) === 'OggS') return 'audio/ogg';
+  if (buf.toString('ascii', 0, 3) === 'ID3' || (buf[0] === 0xff && (buf[1]! & 0xe0) === 0xe0)) return 'audio/mpeg';
   if (buf.toString('ascii', 4, 8) === 'ftyp') {
     const brand = buf.toString('ascii', 8, 12);
-    return brand === 'qt  ' ? 'video/quicktime' : 'video/mp4';
+    return brand === 'qt  ' ? 'video/quicktime' : brand === 'M4A ' ? 'audio/mp4' : 'video/mp4';
   }
   if (startsWith(buf, [0x1a, 0x45, 0xdf, 0xa3])) return 'video/webm';
   if (buf.toString('ascii', 0, 5) === '%PDF-') return 'application/pdf';
@@ -81,6 +84,9 @@ export function inspectMedia(buf: Buffer, declaredMime: string, fileName: string
     }
     return { mimeType: sniffed, kind: 'IMAGE', ...size };
   }
+  if (sniffed.startsWith('audio/')) return { mimeType: sniffed, kind: 'AUDIO' };
+  // WebM is the same container for audio and video; browsers record voice as audio/webm.
+  if (sniffed === 'video/webm' && declaredMime.startsWith('audio/')) return { mimeType: 'audio/webm', kind: 'AUDIO' };
   if (sniffed.startsWith('video/')) return { mimeType: sniffed, kind: 'VIDEO' };
   return { mimeType: sniffed, kind: 'DOCUMENT' };
 }

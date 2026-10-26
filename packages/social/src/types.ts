@@ -83,7 +83,7 @@ export interface SocialProfile {
   profileUrl?: string;
 }
 
-export type MediaKind = 'IMAGE' | 'VIDEO' | 'DOCUMENT';
+export type MediaKind = 'IMAGE' | 'VIDEO' | 'DOCUMENT' | 'AUDIO';
 
 export interface MediaRef {
   url: string;
@@ -140,12 +140,27 @@ export interface NormalizedConversation {
   updatedAt: Date;
 }
 
+/** A file a customer sent with a message. Voice notes get a transcript once transcribed. */
+export interface MessageAttachment {
+  type: string;
+  url?: string;
+  /** Platform media id (WhatsApp), downloaded with the account token */
+  mediaId?: string;
+  mimeType?: string;
+  /** Our stored copy */
+  mediaAssetId?: string;
+  transcript?: string;
+  transcriptProvider?: string;
+  transcriptModel?: string;
+  transcriptError?: string;
+}
+
 export interface NormalizedMessage {
   platformMessageId: string;
   fromPlatformUserId: string;
   isFromAccount: boolean;
   text: string;
-  attachments: { type: string; url?: string }[];
+  attachments: MessageAttachment[];
   createdAt: Date;
 }
 
@@ -188,7 +203,7 @@ export type NormalizedWebhookEvent =
       platformAccountId: string;
       platformConversationId: string;
       contact: { platformUserId: string; name?: string; username?: string; phone?: string };
-      message: { platformMessageId: string; text: string; attachments: { type: string; url?: string }[]; createdAt: Date };
+      message: { platformMessageId: string; text: string; attachments: MessageAttachment[]; createdAt: Date };
       /** true when the account itself sent it (echo) — stored, never answered */
       isEcho: boolean;
     }
@@ -236,6 +251,8 @@ export interface SocialPlatformAdapter {
   getConversations(account: SocialAccount): Promise<NormalizedConversation[]>;
   getMessages(account: SocialAccount, conversationId: string): Promise<NormalizedMessage[]>;
   sendMessage(account: SocialAccount, input: SendMessageInput): Promise<MessageResult>;
+  /** Downloads a file a customer sent, by its platform media id (WhatsApp voice notes, photos). */
+  downloadMedia?(account: SocialAccount, mediaId: string): Promise<{ data: Buffer; mimeType: string }>;
 
   getAnalytics(account: SocialAccount, range: DateRange, platformPostIds?: string[]): Promise<AnalyticsResult>;
 

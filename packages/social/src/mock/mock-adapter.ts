@@ -9,6 +9,7 @@ import type {
   ConnectedAccount,
   DateRange,
   MediaPost,
+  MessageAttachment,
   MessageResult,
   NormalizedComment,
   NormalizedConversation,
@@ -255,7 +256,7 @@ export function signMockWebhook(secret: string, body: Buffer | string): string {
 /** Simulated webhook payload — a simplified, platform-neutral format. */
 export interface MockWebhookPayload {
   events: (
-    | { type: 'message'; id: string; accountId: string; from: { id: string; name?: string; username?: string }; text: string; timestamp?: string }
+    | { type: 'message'; id: string; accountId: string; from: { id: string; name?: string; username?: string }; text: string; attachments?: MessageAttachment[]; timestamp?: string }
     | { type: 'comment'; id: string; accountId: string; postId: string; from: { id: string; name?: string; username?: string }; text: string; parentId?: string; timestamp?: string }
   )[];
 }
@@ -289,7 +290,7 @@ export function parseMockWebhook(platform: PlatformKey, payload: unknown): Norma
       platformAccountId: e.accountId,
       platformConversationId: `${e.accountId}:${e.from.id}`,
       contact: { platformUserId: e.from.id, name: e.from.name, username: e.from.username },
-      message: { platformMessageId: e.id, text: e.text, attachments: [], createdAt },
+      message: { platformMessageId: e.id, text: e.text, attachments: (e.attachments ?? []).slice(0, 5).map((a) => ({ type: String(a.type), mediaAssetId: a.mediaAssetId, mimeType: a.mimeType })), createdAt },
       isEcho: false,
     };
   });

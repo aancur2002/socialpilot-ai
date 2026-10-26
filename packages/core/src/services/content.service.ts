@@ -372,7 +372,7 @@ export async function listApprovals(ctx: ServiceContext, query: { clientId?: str
 
 // ── Scheduling ──────────────────────────────────────────────────────────
 
-export function mediaRefs(variant: { media: { media: { url: string; mimeType: string; kind: 'IMAGE' | 'VIDEO' | 'DOCUMENT'; size: number; width: number | null; height: number | null; durationSec: number | null } }[] }): MediaRef[] {
+export function mediaRefs(variant: { media: { media: { url: string; mimeType: string; kind: 'IMAGE' | 'VIDEO' | 'DOCUMENT' | 'AUDIO'; size: number; width: number | null; height: number | null; durationSec: number | null } }[] }): MediaRef[] {
   return variant.media.map(({ media: m }) => ({ url: m.url, mimeType: m.mimeType, kind: m.kind, size: m.size, width: m.width, height: m.height, durationSec: m.durationSec }));
 }
 

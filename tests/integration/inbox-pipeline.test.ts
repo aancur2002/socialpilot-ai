@@ -64,6 +64,41 @@ describe('webhooks, inbox and AI reply pipeline', () => {
     expect((await send('Thanks! Are you open on Sunday?', 'grateful-user')).result.decision).not.toBe('SKIPPED_NO_REPLY_NEEDED');
   });
 
+  it('transcribes a voice note, then answers it like a typed message', async () => {
+    const account = setup.accounts.INSTAGRAM!;
+    // Two seconds of a 440 Hz tone as 16 kHz mono 16-bit WAV.
+    const rate = 16000;
+    const samples = rate * 2;
+    const wav = Buffer.alloc(44 + samples * 2);
+    wav.write('RIFF', 0); wav.writeUInt32LE(36 + samples * 2, 4); wav.write('WAVE', 8); wav.write('fmt ', 12);
+    wav.writeUInt32LE(16, 16); wav.writeUInt16LE(1, 20); wav.writeUInt16LE(1, 22); wav.writeUInt32LE(rate, 24); wav.writeUInt32LE(rate * 2, 28); wav.writeUInt16LE(2, 32); wav.writeUInt16LE(16, 34);
+    wav.write('data', 36); wav.writeUInt32LE(samples * 2, 40);
+    for (let i = 0; i < samples; i++) wav.writeInt16LE(Math.round(Math.sin((2 * Math.PI * 440 * i) / rate) * 8000), 44 + i * 2);
+
+    const receipt = await core.simulateVoiceNote(owner.ctx, { socialAccountId: account.id, fromName: 'Vee', fromId: 'voice-user', fileName: 'note.wav', declaredMime: 'audio/wav', data: wav });
+    const result = (await drainInbound(account.id)).at(-1)!;
+    expect(result.decision).not.toBe('SKIPPED_TRANSCRIPTION_FAILED');
+    const msg = await db.message.findFirstOrThrow({ where: { platformMessageId: receipt.simulatedEventId } });
+    expect(msg.content).toContain('Voice note, 2 seconds');
+    expect(msg.attachments).toMatchObject([{ type: 'audio', transcriptProvider: 'mock', transcriptModel: 'mock-transcribe-1' }]);
+    const detail = await core.getConversation(owner.ctx, msg.conversationId);
+    const note = (detail.messages.find((m) => m.id === msg.id)!.attachments as { url?: string }[])[0]!;
+    expect(note.url).toBeTruthy();
+    expect(detail.lastMessagePreview).toMatch(/^Voice note: /);
+  });
+
+  it('leaves a voice note for the team when it cannot be transcribed', async () => {
+    const account = setup.accounts.INSTAGRAM!;
+    // An OGG header with no real audio behind it: conversion fails (or ffmpeg is missing).
+    const ogg = Buffer.concat([Buffer.from('OggS'), Buffer.alloc(200, 1)]);
+    const receipt = await core.simulateVoiceNote(owner.ctx, { socialAccountId: account.id, fromId: 'broken-voice', fileName: 'note.ogg', declaredMime: 'audio/ogg', data: ogg });
+    const result = (await drainInbound(account.id)).at(-1)!;
+    expect(result.decision).toBe('SKIPPED_TRANSCRIPTION_FAILED');
+    const msg = await db.message.findFirstOrThrow({ where: { platformMessageId: receipt.simulatedEventId } });
+    expect(msg.content).toBe('');
+    expect((msg.attachments as { transcriptError?: string }[])[0]!.transcriptError).toBeTruthy();
+  });
+
   it('answers from the knowledge base, holds for approval by default and detects a lead', async () => {
     const { result } = await send('How much does a sourdough loaf cost?');
     expect(result).toMatchObject({ decision: 'PENDING_APPROVAL', intent: 'PRICE' });

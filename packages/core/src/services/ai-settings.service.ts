@@ -1,4 +1,18 @@
-import { createAIProvider, createEmbeddingProvider, FailoverAIProvider, MetaImageProvider, MockImageProvider, type AIProvider, type EmbeddingProvider, type ImageProvider } from '@socialpilot/ai';
+import {
+  createAIProvider,
+  createEmbeddingProvider,
+  FailoverAIProvider,
+  FailoverTranscriber,
+  GeminiTranscriber,
+  MetaImageProvider,
+  MetaTranscriber,
+  MockImageProvider,
+  MockTranscriber,
+  type AIProvider,
+  type EmbeddingProvider,
+  type ImageProvider,
+  type TranscriptionProvider,
+} from '@socialpilot/ai';
 import { decryptSecret, encryptSecret } from '@socialpilot/auth';
 import { isProduction } from '@socialpilot/config';
 import type { OrganizationAiSettings, Prisma } from '@socialpilot/database';
@@ -428,4 +442,21 @@ export async function imageProviderFor(organizationId: string): Promise<ImagePro
   if (key) return new MetaImageProvider({ apiKey: key });
   if (!isProduction(env)) return new MockImageProvider();
   throw badRequest('Image generation uses Meta Muse Image. Add a Meta Model API key in Settings → AI models (as the main or a backup provider).');
+}
+
+/**
+ * Voice notes: Meta Muse Voice Transcribe first, Gemini as the backup, and the
+ * offline stand-in outside production. Uses whichever keys are saved.
+ */
+export async function transcriptionProviderFor(organizationId: string): Promise<TranscriptionProvider> {
+  const { db, env, logger } = getInfra();
+  const row = await db.organizationAiSettings.findUnique({ where: { organizationId } });
+  const chain: TranscriptionProvider[] = [];
+  const meta = keyForProvider(organizationId, row, 'meta');
+  if (meta) chain.push(new MetaTranscriber({ apiKey: meta }));
+  const google = keyForProvider(organizationId, row, 'google');
+  if (google) chain.push(new GeminiTranscriber({ apiKey: google }));
+  if (!isProduction(env)) chain.push(new MockTranscriber());
+  if (!chain.length) throw badRequest('Voice notes are transcribed with Meta Muse Voice Transcribe (or Google Gemini). Add one of these keys in Settings → AI models.');
+  return new FailoverTranscriber(chain, (from, reason) => logger.warn({ organizationId, from, reason }, 'Transcription provider failed, trying the next one'));
 }

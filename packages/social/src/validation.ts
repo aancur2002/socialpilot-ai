@@ -77,8 +77,8 @@ export function validateContentForPlatform(caps: PlatformCapabilities, input: Co
   if (videos.length && !caps.videoPublishing) issues.push({ code: 'VIDEO_UNSUPPORTED', message: `${platform} video publishing is not supported.` });
 
   for (const m of input.media) {
-    if (m.kind === 'DOCUMENT') {
-      issues.push({ code: 'MEDIA_TYPE_UNSUPPORTED', message: `Documents cannot be published to ${platform}.` });
+    if (m.kind === 'DOCUMENT' || m.kind === 'AUDIO') {
+      issues.push({ code: 'MEDIA_TYPE_UNSUPPORTED', message: `${m.kind === 'AUDIO' ? 'Audio files' : 'Documents'} cannot be published to ${platform}.` });
       continue;
     }
     const allowed = m.kind === 'IMAGE' ? caps.supportedImageTypes : caps.supportedVideoTypes;

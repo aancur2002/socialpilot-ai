@@ -225,7 +225,19 @@ export interface Message {
   confidence: number | null;
   isSpam: boolean;
   error: string | null;
+  attachments?: MessageAttachment[] | null;
   createdAt: string;
+}
+
+export interface MessageAttachment {
+  type: string;
+  url?: string;
+  mimeType?: string;
+  mediaAssetId?: string;
+  transcript?: string;
+  transcriptProvider?: string;
+  transcriptModel?: string;
+  transcriptError?: string;
 }
 
 export interface Suggestion {

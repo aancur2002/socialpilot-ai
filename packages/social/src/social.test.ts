@@ -164,6 +164,14 @@ describe('webhooks', () => {
     expect(wa[1]).toMatchObject({ kind: 'status', status: 'delivered' });
   });
 
+  it('keeps the media id of a WhatsApp voice note so it can be downloaded and transcribed', () => {
+    const [event] = parseWhatsAppWebhook({
+      object: 'whatsapp_business_account',
+      entry: [{ id: 'W', changes: [{ field: 'messages', value: { metadata: { phone_number_id: 'P1' }, messages: [{ from: '447', id: 'wamid.2', timestamp: '1700000000', type: 'audio', audio: { id: 'MEDIA1', mime_type: 'audio/ogg; codecs=opus', voice: true } }] } }] }],
+    });
+    expect(event).toMatchObject({ kind: 'message', message: { text: '', attachments: [{ type: 'audio', mediaId: 'MEDIA1', mimeType: 'audio/ogg; codecs=opus' }] } });
+  });
+
   it('ignores payloads for other objects', () => {
     expect(parseFacebookWebhook({ object: 'instagram', entry: [] })).toEqual([]);
     expect(parseWhatsAppWebhook(null)).toEqual([]);

@@ -125,6 +125,16 @@ export class WhatsAppAdapter extends BaseAdapter {
     return { platformMessageId: id, sentAt: new Date() };
   }
 
+  /** Media is fetched in two steps: its short-lived URL first, then the file, both with the token. */
+  async downloadMedia(account: SocialAccount, mediaId: string): Promise<{ data: Buffer; mimeType: string }> {
+    const authorization = `Bearer ${account.credentials.accessToken}`;
+    const meta = await this.http.get<{ url: string; mime_type: string; file_size?: number }>(this.url(mediaId), { headers: { authorization } });
+    if (meta.file_size && meta.file_size > 32 * 1024 * 1024) throw new SocialApiError({ platform: 'WHATSAPP', code: 'UNKNOWN', message: 'The media file is larger than 32 MB' });
+    const res = await fetch(meta.url, { headers: { authorization }, signal: AbortSignal.timeout(60_000) });
+    if (!res.ok) throw new SocialApiError({ platform: 'WHATSAPP', code: 'UNKNOWN', message: `WhatsApp media download failed (HTTP ${res.status})`, status: res.status });
+    return { data: Buffer.from(await res.arrayBuffer()), mimeType: meta.mime_type };
+  }
+
   handleWebhookChallenge(query: Record<string, string | undefined>): string | null {
     return metaChallenge(query, this.config.webhookVerifyToken);
   }
@@ -147,7 +157,7 @@ interface WaWebhook {
       value: {
         metadata?: { phone_number_id: string; display_phone_number?: string };
         contacts?: { wa_id: string; profile?: { name?: string } }[];
-        messages?: { from: string; id: string; timestamp: string; type: string; text?: { body: string }; image?: { id: string; caption?: string }; button?: { text: string }; interactive?: { button_reply?: { title: string }; list_reply?: { title: string } } }[];
+        messages?: { from: string; id: string; timestamp: string; type: string; text?: { body: string }; image?: { id: string; caption?: string; mime_type?: string }; audio?: { id: string; mime_type?: string; voice?: boolean }; button?: { text: string }; interactive?: { button_reply?: { title: string }; list_reply?: { title: string } } }[];
         statuses?: { id: string; status: string; recipient_id: string }[];
       };
     }[];
@@ -177,7 +187,13 @@ export function parseWhatsAppWebhook(payload: unknown): NormalizedWebhookEvent[]
           message: {
             platformMessageId: m.id,
             text,
-            attachments: m.type !== 'text' && m.type !== 'button' && m.type !== 'interactive' ? [{ type: m.type }] : [],
+            attachments: m.audio
+              ? [{ type: 'audio', mediaId: m.audio.id, mimeType: m.audio.mime_type }]
+              : m.image
+                ? [{ type: 'image', mediaId: m.image.id, mimeType: m.image.mime_type }]
+                : m.type !== 'text' && m.type !== 'button' && m.type !== 'interactive'
+                  ? [{ type: m.type }]
+                  : [],
             createdAt: new Date(Number(m.timestamp) * 1000),
           },
           isEcho: false,

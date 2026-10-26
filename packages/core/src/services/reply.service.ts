@@ -31,13 +31,14 @@ import { escalateConversation, sendConversationReply } from './inbox.service';
 import { upsertDetectedLead } from './lead.service';
 import { notifyClientMembers } from './notification.service';
 import { searchKnowledgeInternal } from './knowledge.service';
+import { pendingVoiceNote, transcribeVoiceNote } from './voice.service';
 
 const LEAD_INTENTS: IntentKey[] = ['PRICE', 'BOOKING', 'QUOTE_REQUEST', 'LEAD', 'AVAILABILITY'];
 const RECENT_WINDOW = 10;
 const SUMMARY_EVERY = 20;
 
 export interface PipelineResult {
-  decision: ReplyDecision | 'SKIPPED_SPAM' | 'SKIPPED_AI_DISABLED' | 'SKIPPED_ACCOUNT_BLOCKED' | 'SKIPPED_NO_REPLY_NEEDED' | 'ALREADY_PROCESSED' | 'NOT_INBOUND';
+  decision: ReplyDecision | 'SKIPPED_SPAM' | 'SKIPPED_AI_DISABLED' | 'SKIPPED_ACCOUNT_BLOCKED' | 'SKIPPED_NO_REPLY_NEEDED' | 'SKIPPED_TRANSCRIPTION_FAILED' | 'ALREADY_PROCESSED' | 'NOT_INBOUND';
   suggestionId?: string;
   intent?: Intent;
   confidence?: number;
@@ -142,6 +143,12 @@ async function runPipeline(messageId: string, opts: { force?: boolean; requested
   if (!settings.aiEnabled) return { decision: 'SKIPPED_AI_DISABLED' };
   // Blocked customers keep receiving messages, but no AI credits are spent on them.
   if ((await organizationAccess(conversation.organizationId)).state === 'blocked') return { decision: 'SKIPPED_ACCOUNT_BLOCKED' };
+  // Voice notes are transcribed first, so the rest of the pipeline reads them like typed messages.
+  if (!message.content.trim() && pendingVoiceNote(message.attachments) >= 0) {
+    const voice = await transcribeVoiceNote(messageId);
+    if (!voice) return { decision: 'SKIPPED_TRANSCRIPTION_FAILED' };
+    message.content = voice.text;
+  }
   // "Thanks", "ok", emoji-only: nothing to answer, so no AI is spent. The message stays unread for the team.
   const noReply = opts.force ? null : noReplyNeeded(message.content);
   if (noReply) {

@@ -1,32 +1,130 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, Bot, CheckCheck, MessageSquarePlus, RefreshCw, Send, UserRound, UserPlus } from 'lucide-react';
+import { AlertTriangle, Bot, CheckCheck, MessageSquarePlus, Mic, RefreshCw, Send, Square, UserRound, UserPlus } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { api, errorMessage } from '@/lib/api';
 import { useSession } from '@/lib/session';
-import type { ConversationDetail, ConversationListItem, Member, Paged, SocialAccount } from '@/lib/types';
+import type { ConversationDetail, ConversationListItem, Member, MessageAttachment, Paged, SocialAccount } from '@/lib/types';
+import { toWav16k } from '@/lib/wav';
 import { ago, ConfidenceMeter, humanize, MockBadge, PlatformChip, platformName, when } from './domain';
 import { Modal } from './ui/overlay';
 import { Badge, Button, cn, EmptyState, ErrorState, Field, Input, Select, Skeleton, Textarea } from './ui/primitives';
 
 const STATUS_STRIP: Record<ConversationListItem['status'], string> = { OPEN: 'strip-sky', PENDING: 'strip-runway', ESCALATED: 'strip-alert', RESOLVED: 'strip-clearance', SPAM: 'strip-idle' };
 
+const MAX_RECORDING_SEC = 120;
+
+/** Records a voice note with the microphone, or takes an audio file, and hands back 16 kHz mono WAV. */
+function VoiceNoteInput({ value, onChange }: { value: Blob | null; onChange: (wav: Blob | null) => void }) {
+  const [recording, setRecording] = useState(false);
+  const [seconds, setSeconds] = useState(0);
+  const [busy, setBusy] = useState(false);
+  const [preview, setPreview] = useState<string | null>(null);
+  const recorder = useRef<MediaRecorder | null>(null);
+  const timer = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (!value) return setPreview(null);
+    const url = URL.createObjectURL(value);
+    setPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [value]);
+  useEffect(() => () => {
+    if (timer.current) clearInterval(timer.current);
+    recorder.current?.stream.getTracks().forEach((t) => t.stop());
+  }, []);
+
+  const convert = async (blob: Blob) => {
+    setBusy(true);
+    try {
+      onChange(await toWav16k(blob));
+    } catch {
+      toast.error('That audio could not be read. Try recording again or use a WAV or MP3 file.');
+    } finally {
+      setBusy(false);
+    }
+  };
+  const stop = () => {
+    if (timer.current) clearInterval(timer.current);
+    recorder.current?.stop();
+    setRecording(false);
+  };
+  const start = async () => {
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch {
+      toast.error('Microphone access was blocked. Allow it in the browser, or choose an audio file instead.');
+      return;
+    }
+    const chunks: Blob[] = [];
+    const rec = new MediaRecorder(stream);
+    rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+    rec.onstop = () => {
+      stream.getTracks().forEach((t) => t.stop());
+      void convert(new Blob(chunks, { type: rec.mimeType }));
+    };
+    recorder.current = rec;
+    onChange(null);
+    setSeconds(0);
+    rec.start();
+    setRecording(true);
+    timer.current = setInterval(() => setSeconds((s) => {
+      if (s + 1 >= MAX_RECORDING_SEC) stop();
+      return s + 1;
+    }), 1000);
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center gap-2">
+        {recording ? (
+          <Button type="button" variant="secondary" size="sm" onClick={stop}>
+            <Square className="h-4 w-4 text-alert" /> Stop ({seconds}s)
+          </Button>
+        ) : (
+          <Button type="button" variant="secondary" size="sm" loading={busy} onClick={start}>
+            <Mic className="h-4 w-4" /> {value ? 'Record again' : 'Record voice note'}
+          </Button>
+        )}
+        <label className="cursor-pointer text-xs text-ink-2 underline underline-offset-2">
+          or choose an audio file
+          <input type="file" accept="audio/*" className="sr-only" onChange={(e) => { const f = e.target.files?.[0]; if (f) void convert(f); e.target.value = ''; }} />
+        </label>
+      </div>
+      {recording && <p className="text-xs text-ink-3">Recording… speak as the customer would, then press Stop.</p>}
+      {preview && <audio controls src={preview} className="h-9 w-full" />}
+    </div>
+  );
+}
+
 function SimulateInbound({ onDone }: { onDone: () => void }) {
   const { clientId } = useSession();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ socialAccountId: '', type: 'message' as 'message' | 'comment', text: '', fromName: 'Test Customer' });
+  const [kind, setKind] = useState<'text' | 'voice'>('text');
+  const [voice, setVoice] = useState<Blob | null>(null);
+  const isVoice = form.type === 'message' && kind === 'voice';
   const accounts = useQuery({ queryKey: ['accounts', clientId], queryFn: () => api<SocialAccount[]>('/social/accounts', { query: { clientId } }), enabled: open });
   const mockAccounts = accounts.data?.filter((a) => a.isMock && (a.capabilities.directMessages || a.capabilities.comments)) ?? [];
   const send = useMutation({
-    mutationFn: () => api('/dev/simulate-inbound', { body: form }),
+    mutationFn: () => {
+      if (!isVoice) return api('/dev/simulate-inbound', { body: form });
+      const data = new FormData();
+      data.append('socialAccountId', form.socialAccountId);
+      data.append('fromName', form.fromName);
+      data.append('audio', voice!, 'voice-note.wav');
+      return api('/dev/simulate-voice-note', { form: data });
+    },
     onSuccess: () => {
-      toast.success('Message received. The AI will process it in a moment.');
+      toast.success(isVoice ? 'Voice note received. It will be transcribed and answered in a moment.' : 'Message received. The AI will process it in a moment.');
       setOpen(false);
       setForm((f) => ({ ...f, text: '' }));
+      setVoice(null);
       setTimeout(onDone, 1500);
     },
     onError: (e) => toast.error(errorMessage(e)),
@@ -36,7 +134,7 @@ function SimulateInbound({ onDone }: { onDone: () => void }) {
       <Button variant="secondary" size="sm" onClick={() => setOpen(true)}>
         <MessageSquarePlus className="h-4 w-4" /> Simulate message
       </Button>
-      <Modal open={open} onOpenChange={setOpen} title="Simulate an inbound message" description="Sends a signed test webhook for a mock account through the real pipeline." footer={<Button loading={send.isPending} disabled={!form.socialAccountId || !form.text.trim()} onClick={() => send.mutate()}>Send test message</Button>}>
+      <Modal open={open} onOpenChange={setOpen} title="Simulate an inbound message" description="Sends a signed test webhook for a mock account through the real pipeline." footer={<Button loading={send.isPending} disabled={!form.socialAccountId || (isVoice ? !voice : !form.text.trim())} onClick={() => send.mutate()}>{isVoice ? 'Send voice note' : 'Send test message'}</Button>}>
         <div className="space-y-4">
           <Field label="Mock account" htmlFor="sim-acc">
             <Select id="sim-acc" value={form.socialAccountId} onChange={(e) => setForm({ ...form, socialAccountId: e.target.value })}>
@@ -57,12 +155,41 @@ function SimulateInbound({ onDone }: { onDone: () => void }) {
           <Field label="From" htmlFor="sim-from">
             <Input id="sim-from" value={form.fromName} onChange={(e) => setForm({ ...form, fromName: e.target.value })} />
           </Field>
-          <Field label="Message" htmlFor="sim-text">
-            <Textarea id="sim-text" value={form.text} onChange={(e) => setForm({ ...form, text: e.target.value })} placeholder="How much is a sourdough loaf?" />
-          </Field>
+          {form.type === 'message' && (
+            <Field label="Send as" htmlFor="sim-kind">
+              <Select id="sim-kind" value={kind} onChange={(e) => setKind(e.target.value as 'text' | 'voice')}>
+                <option value="text">Text</option>
+                <option value="voice">Voice note</option>
+              </Select>
+            </Field>
+          )}
+          {isVoice ? (
+            <Field label="Voice note" htmlFor="sim-voice">
+              <VoiceNoteInput value={voice} onChange={setVoice} />
+            </Field>
+          ) : (
+            <Field label="Message" htmlFor="sim-text">
+              <Textarea id="sim-text" value={form.text} onChange={(e) => setForm({ ...form, text: e.target.value })} placeholder="How much is a sourdough loaf?" />
+            </Field>
+          )}
         </div>
       </Modal>
     </>
+  );
+}
+
+const TRANSCRIBER: Record<string, string> = { meta: 'Meta Muse Voice Transcribe', google: 'Google Gemini (backup)', mock: 'the offline stand-in' };
+const voiceNotes = (attachments: MessageAttachment[] | null | undefined) => (attachments ?? []).filter((a) => a?.type === 'audio');
+
+function VoiceNote({ note }: { note: MessageAttachment }) {
+  return (
+    <div className="mb-1.5 space-y-1">
+      {note.url ? <audio controls preload="none" src={note.url} className="h-9 w-64 max-w-full" aria-label="Voice note" /> : <p className="font-medium">Voice note</p>}
+      <p className="flex items-center gap-1 text-[11px] text-ink-3">
+        <Mic className="h-3 w-3" />
+        {note.transcript ? `Transcribed by ${TRANSCRIBER[note.transcriptProvider ?? ''] ?? note.transcriptProvider}` : note.transcriptError ? <span className="text-alert">Couldn’t transcribe: {note.transcriptError}</span> : 'Transcribing…'}
+      </p>
+    </div>
   );
 }
 
@@ -73,7 +200,10 @@ function ConversationPanel({ id }: { id: string }) {
   const [usingSuggestion, setUsingSuggestion] = useState<string | null>(null);
   const [escalateOpen, setEscalateOpen] = useState(false);
   const [reason, setReason] = useState('');
-  const q = useQuery({ queryKey: ['conversation', id], queryFn: () => api<ConversationDetail>(`/inbox/conversations/${id}`), refetchInterval: 15_000 });
+  const q = useQuery({ queryKey: ['conversation', id], queryFn: () => api<ConversationDetail>(`/inbox/conversations/${id}`),
+    // Poll faster while a voice note is still being transcribed.
+    refetchInterval: (query) => (query.state.data?.messages.some((m) => voiceNotes(m.attachments).some((a) => !a.transcript && !a.transcriptError)) ? 2_000 : 15_000),
+  });
   const members = useQuery({ queryKey: ['members'], queryFn: () => api<{ members: Member[] }>('/organizations/current/members'), enabled: can('users:view') });
 
   const pending = q.data?.suggestions.find((s) => ['PENDING_APPROVAL', 'ESCALATED', 'QUEUED_AFTER_HOURS'].includes(s.decision));
@@ -152,7 +282,8 @@ function ConversationPanel({ id }: { id: string }) {
             {c.messages.map((m) => (
               <li key={m.id} className={cn('flex', m.direction === 'OUTBOUND' ? 'justify-end' : 'justify-start')}>
                 <div className={cn('max-w-[78%] rounded-[var(--radius-panel)] px-3.5 py-2.5 text-sm', m.direction === 'OUTBOUND' ? 'bg-clearance-soft' : 'border border-line bg-surface', m.status === 'FAILED' && 'border border-alert')}>
-                  <p className="whitespace-pre-wrap">{m.content}</p>
+                  {voiceNotes(m.attachments).map((a, i) => <VoiceNote key={i} note={a} />)}
+                  {m.content && <p className="whitespace-pre-wrap">{m.content}</p>}
                   <p className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-ink-3">
                     {m.direction === 'OUTBOUND' ? (m.senderType === 'AI' ? 'Sent automatically by AI' : 'Sent by your team') : when(m.createdAt)}
                     {m.direction === 'OUTBOUND' && `, ${ago(m.createdAt)}`}

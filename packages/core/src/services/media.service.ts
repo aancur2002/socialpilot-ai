@@ -10,6 +10,11 @@ export const MAX_UPLOAD_BYTES = 200 * 1024 * 1024;
 const EXT: Record<string, string> = {
   'image/jpeg': 'jpg',
   'image/png': 'png',
+  'audio/wav': 'wav',
+  'audio/ogg': 'ogg',
+  'audio/mpeg': 'mp3',
+  'audio/mp4': 'm4a',
+  'audio/webm': 'weba',
   'image/gif': 'gif',
   'image/webp': 'webp',
   'video/mp4': 'mp4',
@@ -27,7 +32,7 @@ export async function uploadMedia(ctx: AuthContext, input: { clientId: string; f
   if (input.data.length === 0) throw badRequest('The file is empty');
   if (input.data.length > MAX_UPLOAD_BYTES) throw badRequest('The file exceeds the 200 MB upload limit');
   const info = inspectMedia(input.data, input.declaredMime, input.fileName);
-  if (!info) throw badRequest('Unsupported file type. Upload JPEG, PNG, GIF, WebP, MP4, MOV, WebM, PDF or plain text.');
+  if (!info) throw badRequest('Unsupported file type. Upload JPEG, PNG, GIF, WebP, MP4, MOV, WebM, WAV, OGG, MP3, M4A, PDF or plain text.');
 
   const { db, storage } = getInfra();
   const key = `org/${ctx.organizationId}/client/${input.clientId}/${new Date().toISOString().slice(0, 7)}/${randomUUID()}.${EXT[info.mimeType] ?? 'bin'}`;

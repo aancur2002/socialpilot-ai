@@ -51,6 +51,8 @@ CMD ["sh", "-c", "[ \"$SKIP_MIGRATIONS\" = true ] || npx prisma migrate deploy -
 # ── Worker ──
 FROM base AS worker
 ENV NODE_ENV=production SERVICE_NAME=worker
+# ffmpeg converts WhatsApp voice notes (OGG/Opus) to the WAV that Muse Voice Transcribe takes.
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg && rm -rf /var/lib/apt/lists/*
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/package.json ./package.json
 COPY --from=build /app/apps/worker/dist ./apps/worker/dist
