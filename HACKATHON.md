@@ -86,7 +86,7 @@ Record with mock social accounts unless your Meta app has passed App Review. Say
 - [ ] `.env` and any keys are **not** in the repository (`git log -p | grep -i "api_key"` returns nothing real).
 - [x] The README opens with the pitch and screenshots.
 - [ ] Meta billing is active on your developer account (the key currently returns HTTP 402), then **Test connection** shows Meta as OK and **Generate image** produces a real picture.
-- [x] License: all rights reserved (LICENSE). Switch to AGPL-3.0 only if the rules require open source.
+- [x] License: AGPL-3.0 (open source, as the rules' "Open source: repositories must be public" asks). Repository made public on 2026-10-26.
 - [ ] Demo video recorded with the Meta provider selected (show **Settings → AI models** briefly).
 - [ ] `npm run test:all` passes.
 - [ ] Keep an eye on credit use: **Settings → General** shows AI generations this month, and your usage is also on the Meta developer dashboard.

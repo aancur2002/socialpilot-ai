@@ -157,4 +157,4 @@ The product runs end to end with mock platform accounts. The real platform adapt
 
 ## License
 
-Copyright © 2026 Anup Ghimire. All rights reserved. The source is shared for viewing and evaluation only; see [LICENSE](LICENSE).
+Copyright © 2026 Anup Ghimire. Licensed under the [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0-only): you may use, modify and share it, but if you run a modified version as a network service, you must publish your source code under the same license.
