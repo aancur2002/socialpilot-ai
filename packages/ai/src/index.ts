@@ -15,6 +15,7 @@ export * from './no-reply';
 export * from './factory';
 export * from './agents';
 export * from './agents/runner';
+export * from './agents/campaign';
 export type { BrandContext } from './prompts/shared';
 export type { KnowledgeSnippet, ReplyPromptInput } from './prompts/reply-agent';
 export { CONTENT_AGENT_VERSION } from './prompts/content-agent';

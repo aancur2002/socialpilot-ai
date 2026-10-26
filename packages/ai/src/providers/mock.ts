@@ -1,8 +1,11 @@
 import { createHash } from 'node:crypto';
 import type { z } from 'zod';
 import type { IntentKey } from '@socialpilot/validation';
+import { mockCampaignTurn } from '../agents/campaign';
 import { detectPromptInjection } from '../injection';
 import {
+  type ChatWithToolsInput,
+  type ChatWithToolsResult,
   AiOutputValidationError,
   type AIProvider,
   type EmbeddingProvider,
@@ -190,6 +193,12 @@ export class MockAIProvider implements AIProvider {
 
   modelFor(tier: ModelTier): string {
     return tier === 'fast' ? 'mock-fast-v1' : 'mock-v1';
+  }
+
+  /** Tool calling: the Campaign Agent's tools get a scripted run; anything else gets a plain answer. */
+  async chatWithTools(input: ChatWithToolsInput): Promise<ChatWithToolsResult> {
+    if (input.tools.some((t) => t.name === 'create_post_draft')) return mockCampaignTurn(input.messages);
+    return { text: 'Done.', toolCalls: [], model: 'mock-v1', usage: {} };
   }
 
   async generateText(input: GenerateTextInput): Promise<GenerateTextResult> {

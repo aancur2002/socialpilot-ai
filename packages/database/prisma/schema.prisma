@@ -557,6 +557,7 @@ model Client {
   automationRules  AutomationRule[]
   leadForms        LeadForm[]
   leadApiKeys      LeadApiKey[]
+  agentRuns        AgentRun[]
   media            MediaAsset[]
 
   @@unique([organizationId, slug])
@@ -1456,4 +1457,35 @@ model WebhookEvent {
   @@index([status, receivedAt])
   @@index([socialAccountId])
   @@index([organizationId, receivedAt])
+}
+
+/// A Campaign Agent run: a goal turned into post drafts, images and a form, step by step.
+model AgentRun {
+  id             String    @id @default(cuid())
+  organizationId String
+  clientId       String
+  createdById    String
+  goal           String
+  startDate      DateTime
+  days           Int
+  /// QUEUED | RUNNING | COMPLETED | FAILED | CANCELLED
+  status         String    @default("QUEUED")
+  /// [{ at, tool, input, output, ok }] in order, shown as the run's timeline
+  steps          Json      @default("[]")
+  summary        String?
+  error          String?
+  campaignId     String?
+  provider       String?
+  model          String?
+  inputTokens    Int       @default(0)
+  outputTokens   Int       @default(0)
+  startedAt      DateTime?
+  finishedAt     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+  @@index([clientId])
 }

@@ -4,6 +4,8 @@ import {
   AiOutputValidationError,
   AiProviderError,
   type AIProvider,
+  type ChatWithToolsInput,
+  type ChatWithToolsResult,
   type EmbeddingProvider,
   type EmbeddingPurpose,
   type GenerateStructuredInput,
@@ -164,7 +166,10 @@ async function compatibleFetchOnce<T>(fetchImpl: FetchImpl, label: string, baseU
 
 interface ChatCompletion {
   model: string;
-  choices: { message: { content: string | null; refusal?: string | null }; finish_reason: string }[];
+  choices: {
+    message: { content: string | null; refusal?: string | null; tool_calls?: { id: string; type: string; function: { name: string; arguments: string } }[] };
+    finish_reason: string;
+  }[];
   usage?: { prompt_tokens: number; completion_tokens: number };
 }
 
@@ -223,6 +228,36 @@ export class OpenAIProvider implements AIProvider {
 
   async generateText(input: GenerateTextInput): Promise<GenerateTextResult> {
     return this.complete(input);
+  }
+
+  /** One turn of tool calling in the OpenAI-compatible format (Meta, Gemini, NVIDIA, OpenAI). */
+  async chatWithTools(input: ChatWithToolsInput): Promise<ChatWithToolsResult> {
+    const tier = input.tier ?? 'default';
+    const model = this.modelFor(tier);
+    const res = await compatibleFetch<ChatCompletion>(this.fetchImpl, this.preset.label, this.baseUrl, this.config.apiKey, '/chat/completions', {
+      model,
+      [this.preset.maxTokensParam]: input.maxTokens ?? 4096,
+      ...(this.preset.reasoningEffort ? { reasoning_effort: tier === 'fast' ? 'minimal' : (input.effort ?? 'low') } : {}),
+      messages: input.messages.map((m) =>
+        m.role === 'assistant'
+          ? { role: 'assistant', content: m.content, ...(m.toolCalls?.length ? { tool_calls: m.toolCalls.map((c) => ({ id: c.id, type: 'function', function: { name: c.name, arguments: c.arguments } })) } : {}) }
+          : m.role === 'tool'
+            ? { role: 'tool', tool_call_id: m.toolCallId, content: m.content }
+            : { role: m.role, content: m.content },
+      ),
+      tools: input.tools.map((t) => ({ type: 'function', function: { name: t.name, description: t.description, parameters: t.parameters } })),
+      tool_choice: 'auto',
+    });
+    const choice = res.choices[0];
+    if (!choice) throw new AiProviderError('Empty completion', true, 'server');
+    if (choice.message.refusal) throw new AiProviderError('The model declined this request', false, 'refusal');
+    if (choice.finish_reason === 'length' && !choice.message.tool_calls?.length) throw new AiProviderError('Model output was truncated', true, 'truncated');
+    return {
+      text: choice.message.content ?? null,
+      toolCalls: (choice.message.tool_calls ?? []).filter((c) => c.function?.name).map((c, i) => ({ id: c.id || `call_${i}`, name: c.function.name, arguments: c.function.arguments || '{}' })),
+      model: res.model ?? model,
+      usage: { inputTokens: res.usage?.prompt_tokens, outputTokens: res.usage?.completion_tokens },
+    };
   }
 
   /** Model IDs this key can use, straight from the service's /models endpoint. */

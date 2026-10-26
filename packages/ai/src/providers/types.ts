@@ -48,6 +48,44 @@ export interface GenerateStructuredResult<T> {
   provider?: string;
 }
 
+// ── Tool calling (agents) ─────────────────────────────────────────────
+
+/** A function the model may call; `parameters` is a JSON schema object. */
+export interface ToolSpec {
+  name: string;
+  description: string;
+  parameters: Record<string, unknown>;
+}
+
+export interface ToolCall {
+  id: string;
+  name: string;
+  /** JSON-encoded arguments, exactly as the model produced them */
+  arguments: string;
+}
+
+export type AgentMessage =
+  | { role: 'system' | 'user'; content: string }
+  | { role: 'assistant'; content: string | null; toolCalls?: ToolCall[] }
+  | { role: 'tool'; toolCallId: string; name: string; content: string };
+
+export interface ChatWithToolsInput {
+  messages: AgentMessage[];
+  tools: ToolSpec[];
+  tier?: ModelTier;
+  maxTokens?: number;
+  effort?: Effort;
+}
+
+export interface ChatWithToolsResult {
+  /** The model's text, when it answered instead of (or alongside) calling tools */
+  text: string | null;
+  toolCalls: ToolCall[];
+  model: string;
+  usage: TokenUsage;
+  provider?: string;
+}
+
 /** Vendor-neutral LLM interface. The application never imports a vendor SDK directly. */
 export interface AIProvider {
   readonly name: string;
@@ -57,6 +95,8 @@ export interface AIProvider {
   generateStructured<S extends z.ZodType>(input: GenerateStructuredInput<S>): Promise<GenerateStructuredResult<z.infer<S>>>;
   /** Model IDs available to this key, where the provider can list them. */
   listModels?(): Promise<string[]>;
+  /** One turn of a tool-calling conversation (agents). */
+  chatWithTools?(input: ChatWithToolsInput): Promise<ChatWithToolsResult>;
 }
 
 /** Some embedding models encode questions and documents differently. */

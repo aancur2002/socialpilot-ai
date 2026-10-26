@@ -35,3 +35,4 @@ export * from './services/email.service';
 export * from './services/lead-capture.service';
 export * from './services/stripe.service';
 export * from './services/legal.service';
+export * from './services/campaign-agent.service';

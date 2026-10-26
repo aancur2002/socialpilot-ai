@@ -550,3 +550,11 @@ export const stripeSettingsSchema = z.object({
 });
 export const stripeEnableSchema = z.object({ enabled: z.boolean() });
 export const checkoutSchema = z.object({ months: z.number().int().min(1).max(24).default(1) });
+
+// ── Campaign Agent ─────────────────────────────────────────────────────
+export const startCampaignRunSchema = z.object({
+  clientId: idSchema,
+  goal: z.string().trim().min(10, 'Describe the goal in a sentence').max(1000),
+  startDate: z.coerce.date().optional(),
+  days: z.number().int().min(2).max(30).default(7),
+});

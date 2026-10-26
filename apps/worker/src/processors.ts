@@ -1,6 +1,7 @@
 import {
   collectAccountAnalytics,
   deliverLeadWebhook,
+  executeCampaignRun,
   deliverNotificationEmail,
   executePublish,
   getInfra,
@@ -108,4 +109,9 @@ export async function maintenanceProcessor(job: Job<JobPayloads['maintenance']>)
 /** Outgoing lead webhooks; failures throw so BullMQ retries with backoff. */
 export async function outboundProcessor(job: Job<JobPayloads['outbound']>) {
   return deliverLeadWebhook(job.data.webhookId, job.data.event, job.data.leadId);
+}
+
+/** Campaign Agent runs. Not retried automatically: a retry could create duplicate posts. */
+export async function agentProcessor(job: Job<JobPayloads['agent']>) {
+  return executeCampaignRun(job.data.runId);
 }

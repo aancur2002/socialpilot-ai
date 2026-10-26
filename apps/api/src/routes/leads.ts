@@ -1,6 +1,7 @@
 import * as core from '@socialpilot/core';
 import {
   checkoutSchema,
+  startCampaignRunSchema,
   companySettingsSchema,
   createLeadApiKeySchema,
   createLeadFormSchema,
@@ -132,5 +133,18 @@ export async function stripeWebhookRoutes(app: FastifyInstance) {
   app.post('/webhooks/stripe', { config: { rateLimit: { max: 300, timeWindow: '1 minute' } } }, async (req) => {
     const sig = req.headers['stripe-signature'];
     return core.handleStripeWebhook(req.rawBody ?? Buffer.from(''), typeof sig === 'string' ? sig : undefined);
+  });
+}
+
+/** Campaign Agent: start a run, follow its timeline, cancel it. */
+export async function campaignAgentRoutes(app: FastifyInstance) {
+  app.post('/agent/campaigns', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } }, schema: { tags: ['agent'], body: doc(startCampaignRunSchema) } }, async (req, reply) =>
+    reply.status(202).send(await core.startCampaignRun(await requireCtx(req), parse(startCampaignRunSchema, req.body))),
+  );
+  app.get('/agent/campaigns', { schema: { tags: ['agent'] } }, async (req) => core.listCampaignRuns(await requireCtx(req), parse(z.object({ clientId: z.string().max(64).optional() }), req.query).clientId));
+  app.get('/agent/campaigns/:id', { schema: { tags: ['agent'] } }, async (req) => core.getCampaignRun(await requireCtx(req), parse(idParam, req.params).id));
+  app.post('/agent/campaigns/:id/cancel', { schema: { tags: ['agent'] } }, async (req, reply) => {
+    await core.cancelCampaignRun(await requireCtx(req), parse(idParam, req.params).id);
+    return noContent(reply);
   });
 }

@@ -3,6 +3,8 @@ import {
   AiOutputValidationError,
   AiProviderError,
   type AIProvider,
+  type ChatWithToolsInput,
+  type ChatWithToolsResult,
   type GenerateStructuredInput,
   type GenerateStructuredResult,
   type GenerateTextInput,
@@ -96,5 +98,14 @@ export class FailoverAIProvider implements AIProvider {
 
   async generateStructured<S extends z.ZodType>(input: GenerateStructuredInput<S>): Promise<GenerateStructuredResult<z.infer<S>>> {
     return this.run((p) => p.generateStructured(input));
+  }
+
+  /** Tool calling, across the providers in the chain that support it. */
+  async chatWithTools(input: ChatWithToolsInput): Promise<ChatWithToolsResult> {
+    return this.run((p) => {
+      // 'unknown' has no cooldown: skipping a provider without tool calling mustn't block its other calls.
+      if (!p.chatWithTools) throw new AiProviderError(`${p.name} does not support tool calling`, false, 'unknown');
+      return p.chatWithTools(input);
+    });
   }
 }
