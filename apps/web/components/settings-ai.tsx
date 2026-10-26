@@ -23,7 +23,7 @@ interface AiSettingsView {
   effective: { provider: string; model: string; fastModel: string; embeddingProvider: string; embeddingModel: string; apiKeySource: 'organization' | 'server' | 'none'; chain: { provider: string; model: string }[] };
   serverDefaults: { provider: string; model: string | null; fastModel: string | null; embeddingProvider: string };
   mockAllowed: boolean;
-  suggestions: Record<'anthropic' | 'openai' | 'google' | 'nvidia' | 'meta', string[]> & { embeddings: Record<'openai' | 'google' | 'nvidia', string[]> };
+  suggestions: Record<'anthropic' | 'openai' | 'google' | 'nvidia' | 'meta' | 'baseten' | 'modal', string[]> & { embeddings: Record<'openai' | 'google' | 'nvidia', string[]> };
   reindexRequired?: boolean;
   reindexQueued?: number | null;
 }
@@ -49,6 +49,8 @@ const PROVIDER_NAMES: Record<string, string> = {
   google: 'Google Gemini',
   nvidia: 'NVIDIA NIM',
   meta: 'Meta Model API (Muse Spark)',
+  baseten: 'Baseten (Muse Spark Open, open weights)',
+  modal: 'Modal (Muse Glimmer, your own deployment)',
   mock: 'Mock (offline, development only)',
 };
 
@@ -59,6 +61,8 @@ const KEY_HELP: Record<string, string> = {
   google: 'Free tier available: create a key at aistudio.google.com (Get API key). Free-tier limits are low and prompts may be used to improve Google’s products, so use it for testing.',
   nvidia: 'Free credits available: sign in at build.nvidia.com, open any model and choose Get API Key (keys start with nvapi-). Good for testing Llama, Nemotron, DeepSeek and more.',
   meta: 'Create a key at dev.meta.ai (Meta Model API). Muse Spark writes posts and replies; Meta has no embedding model, so keep Google or NVIDIA below for knowledge search.',
+  baseten: 'Meta’s open-weight flagship, hosted by Baseten. Create a key at app.baseten.co (Settings → API keys). Keep Google or NVIDIA below for knowledge search.',
+  modal: 'Meta’s open-weight Muse Glimmer on your own Modal GPU. Deploy infra/modal/glimmer.py, then enter its URL as the base URL and the key you set in the Modal secret.',
 };
 
 const EMBEDDING_NAMES: Record<string, string> = {
@@ -152,7 +156,7 @@ export function AiModelSettings() {
   const provider = f.provider || d.serverDefaults.provider;
   const suggestions = provider === 'mock' ? [] : modelsFor('text', provider, d.suggestions[provider as 'anthropic'] ?? []);
   const embeddingProvider = f.embeddingProvider || d.serverDefaults.embeddingProvider;
-  const allProviders = ['meta', 'anthropic', 'openai', 'google', 'nvidia', ...(d.mockAllowed ? ['mock'] : [])];
+  const allProviders = ['meta', 'baseten', 'modal', 'anthropic', 'openai', 'google', 'nvidia', ...(d.mockAllowed ? ['mock'] : [])];
   const usedBy = (i: number) => new Set([provider, ...backups.filter((_, j) => j !== i).map((b) => b.provider)]);
   const updateBackup = (i: number, patch: Partial<BackupRow>) => setBackups((rows) => rows.map((r, j) => (j === i ? { ...r, ...patch } : r)));
   const moveBackup = (i: number, dir: -1 | 1) =>
@@ -226,9 +230,18 @@ export function AiModelSettings() {
                   <ModelPicker id="ai-fast" value={f.fastModel} placeholder={provider === 'meta' ? suggestions[0] : (suggestions[1] ?? '')} onChange={(v) => setF({ ...f, fastModel: v })} models={live('text', provider)} loading={isLoading('text', provider)} onLoad={() => loadModels.mutate({ provider, apiKey: f.apiKey, purpose: 'text' })} />
                 </Field>
                 <KeyField id="ai-key" label="API key" status={d.saved.apiKey} value={f.apiKey} onChange={(v) => setF({ ...f, apiKey: v })} remove={f.removeKey} onRemove={(v) => setF({ ...f, removeKey: v })} />
-                {provider === 'openai' && (
-                  <Field label="Base URL" htmlFor="ai-base" hint="Only for OpenAI-compatible gateways. Blank uses api.openai.com.">
-                    <Input id="ai-base" value={f.baseUrl} placeholder="https://api.openai.com/v1" onChange={(e) => setF({ ...f, baseUrl: e.target.value })} />
+                {[provider, ...backups.map((b) => b.provider)].some((p) => p === 'openai' || p === 'modal') && (
+                  <Field
+                    label="Base URL"
+                    htmlFor="ai-base"
+                    hint={[provider, ...backups.map((b) => b.provider)].includes('modal') ? 'The URL of your Modal deployment, ending in /v1.' : 'Only for OpenAI-compatible gateways. Blank uses api.openai.com.'}
+                  >
+                    <Input
+                      id="ai-base"
+                      value={f.baseUrl}
+                      placeholder={[provider, ...backups.map((b) => b.provider)].includes('modal') ? 'https://your-workspace--socialpilot-glimmer-serve.modal.run/v1' : 'https://api.openai.com/v1'}
+                      onChange={(e) => setF({ ...f, baseUrl: e.target.value })}
+                    />
                   </Field>
                 )}
               </>

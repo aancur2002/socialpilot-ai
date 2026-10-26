@@ -21,7 +21,10 @@ import {
  * Model API (Muse Spark) all speak this API, with small differences captured in the
  * presets below.
  */
-export type CompatibleProvider = 'openai' | 'google' | 'nvidia' | 'meta';
+export type CompatibleProvider = 'openai' | 'google' | 'nvidia' | 'meta' | 'baseten' | 'modal';
+
+/** Providers whose address is set per organization (base URL field in settings). */
+export const CUSTOM_URL_PROVIDERS: readonly CompatibleProvider[] = ['openai', 'modal'];
 
 interface Preset {
   label: string;
@@ -41,6 +44,8 @@ interface Preset {
   reasoningEffort?: boolean;
   /** Returned by listModels when the service has no /models endpoint. */
   knownModels?: string[];
+  /** Reasoning models need room to think before answering; small budgets return empty text. */
+  minMaxTokens?: number;
 }
 
 export const COMPATIBLE_PRESETS: Record<CompatibleProvider, Preset> = {
@@ -91,6 +96,33 @@ export const COMPATIBLE_PRESETS: Record<CompatibleProvider, Preset> = {
     embeddingInputType: false,
     reasoningEffort: true,
     knownModels: ['muse-spark-1.3', 'muse-spark-1.2', 'muse-spark-1.1', 'muse-spark-1.3-contributor', 'muse-spark-1.2-contributor'],
+  },
+  // Meta's open-weight models. Same API shape, served by partners or by you.
+  baseten: {
+    label: 'Baseten',
+    baseUrl: 'https://inference.baseten.co/v1',
+    model: 'meta-models/muse-spark-open',
+    fastModel: 'meta-models/muse-spark-open',
+    embeddingModel: '',
+    maxTokensParam: 'max_tokens',
+    structured: 'negotiate',
+    embeddingDimensionsParam: false,
+    embeddingInputType: false,
+    minMaxTokens: 4096,
+  },
+  modal: {
+    label: 'Modal',
+    // Your own deployment (infra/modal/glimmer.py); set its URL in settings.
+    baseUrl: '',
+    model: 'muse-glimmer',
+    fastModel: 'muse-glimmer',
+    embeddingModel: '',
+    maxTokensParam: 'max_tokens',
+    structured: 'negotiate',
+    embeddingDimensionsParam: false,
+    embeddingInputType: false,
+    minMaxTokens: 4096,
+    knownModels: ['muse-glimmer'],
   },
 };
 
@@ -214,7 +246,7 @@ export class OpenAIProvider implements AIProvider {
     const model = this.modelFor(tier);
     const res = await compatibleFetch<ChatCompletion>(this.fetchImpl, this.preset.label, this.baseUrl, this.config.apiKey, '/chat/completions', {
       model,
-      [this.preset.maxTokensParam]: input.maxTokens ?? 4096,
+      [this.preset.maxTokensParam]: Math.max(input.maxTokens ?? 4096, this.preset.minMaxTokens ?? 0),
       ...(this.preset.reasoningEffort ? { reasoning_effort: tier === 'fast' ? 'minimal' : (input.effort ?? 'low') } : {}),
       messages: [{ role: 'system', content: extraSystem ? `${input.system}\n\n${extraSystem}` : input.system }, ...input.messages],
       ...(responseFormat ? { response_format: responseFormat } : {}),
@@ -236,7 +268,7 @@ export class OpenAIProvider implements AIProvider {
     const model = this.modelFor(tier);
     const res = await compatibleFetch<ChatCompletion>(this.fetchImpl, this.preset.label, this.baseUrl, this.config.apiKey, '/chat/completions', {
       model,
-      [this.preset.maxTokensParam]: input.maxTokens ?? 4096,
+      [this.preset.maxTokensParam]: Math.max(input.maxTokens ?? 4096, this.preset.minMaxTokens ?? 0),
       ...(this.preset.reasoningEffort ? { reasoning_effort: tier === 'fast' ? 'minimal' : (input.effort ?? 'low') } : {}),
       messages: input.messages.map((m) =>
         m.role === 'assistant'

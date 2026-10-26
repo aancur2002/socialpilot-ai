@@ -1,5 +1,6 @@
 import {
   createAIProvider,
+  CUSTOM_URL_PROVIDERS,
   createEmbeddingProvider,
   FailoverAIProvider,
   FailoverTranscriber,
@@ -35,6 +36,9 @@ export const MODEL_SUGGESTIONS = {
   nvidia: ['nvidia/nemotron-3.5-lightning-30b-a3b'],
   // Meta Model API (Muse Spark). The -contributor versions are discounted.
   meta: ['muse-spark-1.3', 'muse-spark-1.2', 'muse-spark-1.1', 'muse-spark-1.3-contributor', 'muse-spark-1.2-contributor'],
+  // Meta's open weights: Muse Spark Open hosted on Baseten, Muse Glimmer on your own Modal deployment.
+  baseten: ['meta-models/muse-spark-open'],
+  modal: ['muse-glimmer'],
   embeddings: {
     openai: ['text-embedding-3-small'],
     google: ['gemini-embedding-001', 'gemini-embedding-2-preview'],
@@ -42,7 +46,7 @@ export const MODEL_SUGGESTIONS = {
   },
 } as const;
 
-type Provider = 'anthropic' | 'openai' | 'google' | 'nvidia' | 'meta' | 'mock';
+type Provider = 'anthropic' | 'openai' | 'google' | 'nvidia' | 'meta' | 'baseten' | 'modal' | 'mock';
 type EmbeddingProviderKey = 'openai' | 'google' | 'nvidia' | 'mock';
 
 interface Resolved {
@@ -107,14 +111,18 @@ function resolve(organizationId: string, row: Partial<OrganizationAiSettings> | 
     model: pick(override?.model, row?.model, sameProvider ? env.AI_MODEL : undefined),
     fastModel: pick(override?.fastModel, row?.fastModel, sameProvider ? env.AI_FAST_MODEL : undefined),
     apiKey,
-    // A custom base URL only applies to the generic OpenAI-compatible provider.
-    baseUrl: provider === 'openai' || embeddingProvider === 'openai' ? ((override?.baseUrl !== undefined ? override.baseUrl || undefined : row?.baseUrl) ?? env.OPENAI_BASE_URL) : undefined,
+    // The base URL is for an endpoint you choose: OpenAI-compatible, or your Modal deployment.
+    baseUrl: [provider, embeddingProvider, ...fallbacks.map((f) => f.provider)].some((p) => customUrl(p))
+      ? ((override?.baseUrl !== undefined ? override.baseUrl || undefined : row?.baseUrl) ?? (provider === 'modal' || fallbacks.some((f) => f.provider === 'modal') ? undefined : env.OPENAI_BASE_URL))
+      : undefined,
     embeddingProvider,
     embeddingModel: pick(override?.embeddingModel, row?.embeddingModel, embeddingProvider === env.EMBEDDING_PROVIDER ? env.EMBEDDING_MODEL : undefined),
     embeddingApiKey,
     fallbacks,
   };
 }
+
+const customUrl = (provider: string) => (CUSTOM_URL_PROVIDERS as readonly string[]).includes(provider);
 
 function storedFallbacks(row: Partial<OrganizationAiSettings> | null): StoredFallback[] {
   return Array.isArray(row?.fallbacks) ? (row.fallbacks as unknown as StoredFallback[]) : [];
@@ -147,6 +155,8 @@ function assertUsable(r: Resolved) {
   for (const f of r.fallbacks) {
     if (f.provider !== 'mock' && !f.apiKey) throw badRequest(`Add an API key for the ${f.provider} backup`);
   }
+  if (providers.includes('modal') && (providers.includes('openai') || r.embeddingProvider === 'openai')) throw badRequest('OpenAI and Modal share the base URL setting, so use one of them');
+  if (providers.includes('modal') && !r.baseUrl) throw badRequest('Enter the URL of your Modal deployment as the base URL, ending in /v1');
   if (r.provider !== 'mock' && !r.apiKey) throw badRequest(`Add an API key for ${r.provider}`);
   if (r.embeddingProvider !== 'mock' && !r.embeddingApiKey) throw badRequest(`Add an API key for ${r.embeddingProvider} embeddings`);
 }
@@ -155,7 +165,7 @@ function assertUsable(r: Resolved) {
 function buildChain(r: Resolved): AIProvider[] {
   const primary = createAIProvider({ provider: r.provider, apiKey: r.apiKey, model: r.model, fastModel: r.fastModel, openaiBaseUrl: r.baseUrl, embeddingProvider: 'mock' });
   const backups = r.fallbacks.map((f) =>
-    createAIProvider({ provider: f.provider, apiKey: f.apiKey, model: f.model, fastModel: f.fastModel, openaiBaseUrl: f.provider === 'openai' ? r.baseUrl : undefined, embeddingProvider: 'mock' }),
+    createAIProvider({ provider: f.provider, apiKey: f.apiKey, model: f.model, fastModel: f.fastModel, openaiBaseUrl: customUrl(f.provider) ? r.baseUrl : undefined, embeddingProvider: 'mock' }),
   );
   return [primary, ...backups];
 }
@@ -348,7 +358,7 @@ export async function listAvailableModels(ctx: AuthContext, input: { provider: s
   const row = await getInfra().db.organizationAiSettings.findUnique({ where: { organizationId: ctx.organizationId } });
   const apiKey = keyForProvider(ctx.organizationId, row, input.provider, input.apiKey);
   if (!apiKey) throw badRequest(`Enter the ${input.provider} API key first`);
-  const provider = createAIProvider({ provider: input.provider as Provider, apiKey, embeddingProvider: 'mock', openaiBaseUrl: input.provider === 'openai' ? (row?.baseUrl ?? getInfra().env.OPENAI_BASE_URL) : undefined });
+  const provider = createAIProvider({ provider: input.provider as Provider, apiKey, embeddingProvider: 'mock', openaiBaseUrl: input.provider === 'openai' ? (row?.baseUrl ?? getInfra().env.OPENAI_BASE_URL) : input.provider === 'modal' ? (row?.baseUrl ?? undefined) : undefined });
   if (!provider.listModels) throw badRequest(`${input.provider} doesn’t offer a model list`);
   try {
     const all = await provider.listModels();
@@ -391,7 +401,7 @@ export async function testAiSettings(ctx: AuthContext, input: AiSettingsInput) {
       provider: f.provider,
       role: 'backup' as const,
       missingKey: f.provider !== 'mock' && !f.apiKey,
-      build: () => createAIProvider({ provider: f.provider, apiKey: f.apiKey, model: f.model, fastModel: f.fastModel, openaiBaseUrl: f.provider === 'openai' ? resolved.baseUrl : undefined, embeddingProvider: 'mock' }),
+      build: () => createAIProvider({ provider: f.provider, apiKey: f.apiKey, model: f.model, fastModel: f.fastModel, openaiBaseUrl: customUrl(f.provider) ? resolved.baseUrl : undefined, embeddingProvider: 'mock' }),
     })),
   ];
   const chain: ChainTestResult[] = [];

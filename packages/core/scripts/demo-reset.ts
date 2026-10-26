@@ -11,7 +11,7 @@ import { execFileSync } from 'node:child_process';
 import { decryptSecret } from '@socialpilot/auth';
 import * as core from '../src/index';
 
-type Provider = 'anthropic' | 'openai' | 'google' | 'nvidia' | 'meta' | 'mock';
+type Provider = 'anthropic' | 'openai' | 'google' | 'nvidia' | 'meta' | 'baseten' | 'modal' | 'mock';
 type EmbeddingProvider = 'openai' | 'google' | 'nvidia' | 'mock';
 
 async function main() {

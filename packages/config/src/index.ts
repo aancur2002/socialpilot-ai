@@ -62,7 +62,7 @@ export const envSchema = z
     JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
     SESSION_TTL_HOURS: z.coerce.number().int().positive().default(168),
 
-    AI_PROVIDER: z.enum(['anthropic', 'openai', 'google', 'nvidia', 'meta', 'mock']).default('mock'),
+    AI_PROVIDER: z.enum(['anthropic', 'openai', 'google', 'nvidia', 'meta', 'baseten', 'modal', 'mock']).default('mock'),
     AI_API_KEY: optionalString,
     AI_MODEL: optionalString,
     AI_FAST_MODEL: optionalString,

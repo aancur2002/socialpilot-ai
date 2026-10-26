@@ -1,6 +1,6 @@
 export * from './providers/types';
 export { AnthropicProvider, ANTHROPIC_DEFAULT_MODEL } from './providers/anthropic';
-export { OpenAIProvider, OpenAIEmbeddingProvider, COMPATIBLE_PRESETS, fitEmbedding, listCompatibleModels, type CompatibleProvider } from './providers/openai';
+export { OpenAIProvider, OpenAIEmbeddingProvider, COMPATIBLE_PRESETS, CUSTOM_URL_PROVIDERS, fitEmbedding, listCompatibleModels, type CompatibleProvider } from './providers/openai';
 export { FailoverAIProvider, type FailoverEvent } from './providers/failover';
 export { MetaTranscriber, GeminiTranscriber, MockTranscriber, FailoverTranscriber, MUSE_TRANSCRIBE_MODEL, wavInfo, isTranscribableWav, type TranscriptionProvider, type TranscriptionInput, type TranscriptionResult } from './providers/transcription';
 export { MetaImageProvider, MockImageProvider, MUSE_IMAGE_MODEL, encodePng, type ImageProvider, type ImageShape, type GeneratedImage, type EditedImage, type ImageEditInput } from './providers/image';
