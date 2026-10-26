@@ -44,3 +44,17 @@ describe('offline image stand-in', () => {
     expect(inflateSync(a.data.subarray(41, 41 + idatLen)).length).toBe((432 * 3 + 1) * 768);
   });
 });
+
+describe('Muse Image edits', () => {
+  it('sends source images as data URLs to /images/edits and returns the edited image', async () => {
+    let sent: { url: string; body: Record<string, unknown> } | undefined;
+    const fetchImpl = (async (url: string, init: RequestInit) => {
+      sent = { url, body: JSON.parse(String(init.body)) };
+      return new Response(JSON.stringify({ data: [{ b64_json: Buffer.from('webp-bytes').toString('base64') }], output_format: 'webp' }), { status: 200, headers: { 'content-type': 'application/json' } });
+    }) as unknown as typeof fetch;
+    const out = await new MetaImageProvider({ apiKey: 'k', fetchImpl }).edit({ images: [{ data: Buffer.from('png'), mimeType: 'image/png' }], prompt: 'on a marble counter' });
+    expect(sent!.url).toBe('https://api.meta.ai/v1/images/edits');
+    expect(sent!.body).toEqual({ model: 'muse-image-1.0', prompt: 'on a marble counter', images: [{ image_url: `data:image/png;base64,${Buffer.from('png').toString('base64')}` }], n: 1 });
+    expect(out).toEqual({ data: Buffer.from('webp-bytes'), mimeType: 'image/webp', model: 'muse-image-1.0' });
+  });
+});

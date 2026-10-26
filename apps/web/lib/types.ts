@@ -122,7 +122,7 @@ export interface MediaAsset {
   url: string;
   fileName: string;
   mimeType: string;
-  kind: 'IMAGE' | 'VIDEO' | 'DOCUMENT';
+  kind: 'IMAGE' | 'VIDEO' | 'DOCUMENT' | 'AUDIO';
   size: number;
   width: number | null;
   height: number | null;

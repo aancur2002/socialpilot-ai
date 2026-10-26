@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.137.0",
+    "@meta-sam/parser": "0.1.0",
     "@socialpilot/validation": "0.1.0",
     "zod": "4.6.7"
   }

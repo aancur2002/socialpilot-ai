@@ -14,10 +14,24 @@ export interface GeneratedImage {
   mimeType: 'image/png';
   model: string;
 }
+export interface EditedImage {
+  data: Buffer;
+  /** Usually WebP or PNG; convert before publishing */
+  mimeType: string;
+  model: string;
+}
+export interface ImageEditInput {
+  /** 1 to 10 source images */
+  images: { data: Buffer; mimeType: string }[];
+  prompt: string;
+  user?: string;
+}
 export interface ImageProvider {
   readonly name: string;
   readonly model: string;
   generate(input: { prompt: string; shape?: ImageShape; user?: string }): Promise<GeneratedImage>;
+  /** Changes or combines existing images following the prompt. */
+  edit(input: ImageEditInput): Promise<EditedImage>;
 }
 
 export const MUSE_IMAGE_MODEL = 'muse-image-1.0';
@@ -47,6 +61,20 @@ export class MetaImageProvider implements ImageProvider {
     const b64 = res.data?.[0]?.b64_json;
     if (!b64) throw new AiProviderError('Muse Image returned no image', true, 'server');
     return { data: Buffer.from(b64, 'base64'), mimeType: 'image/png', model: this.model };
+  }
+
+  /** JSON form of /images/edits: images go in as data URLs. Edits take no mask or size. */
+  async edit(input: ImageEditInput): Promise<EditedImage> {
+    const res = await compatibleFetch<{ data?: { b64_json?: string }[]; output_format?: string }>(this.fetchImpl, 'Meta Model', COMPATIBLE_PRESETS.meta.baseUrl, this.config.apiKey, '/images/edits', {
+      model: this.model,
+      prompt: input.prompt.slice(0, 4000),
+      images: input.images.slice(0, 10).map((img) => ({ image_url: `data:${img.mimeType};base64,${img.data.toString('base64')}` })),
+      n: 1,
+      ...(input.user ? { user: input.user } : {}),
+    });
+    const b64 = res.data?.[0]?.b64_json;
+    if (!b64) throw new AiProviderError('Muse Image returned no image', true, 'server');
+    return { data: Buffer.from(b64, 'base64'), mimeType: `image/${res.output_format ?? 'webp'}`, model: this.model };
   }
 }
 
@@ -109,5 +137,12 @@ export class MockImageProvider implements ImageProvider {
       return [0, 1, 2].map((i) => Math.round(a[i]! * (1 - t) + b[i]! * t + stripe)) as [number, number, number];
     });
     return { data, mimeType: 'image/png', model: this.model };
+  }
+
+  /** Returns the first source image unchanged: the offline stand-in can't edit. */
+  async edit(input: ImageEditInput): Promise<EditedImage> {
+    const first = input.images[0];
+    if (!first) throw new AiProviderError('No image to edit', false, 'invalid_request');
+    return { data: first.data, mimeType: first.mimeType, model: this.model };
   }
 }

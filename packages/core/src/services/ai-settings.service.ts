@@ -5,12 +5,15 @@ import {
   FailoverTranscriber,
   GeminiTranscriber,
   MetaImageProvider,
+  MetaSegmenter,
   MetaTranscriber,
   MockImageProvider,
+  MockSegmenter,
   MockTranscriber,
   type AIProvider,
   type EmbeddingProvider,
   type ImageProvider,
+  type SegmentationProvider,
   type TranscriptionProvider,
 } from '@socialpilot/ai';
 import { decryptSecret, encryptSecret } from '@socialpilot/auth';
@@ -459,4 +462,14 @@ export async function transcriptionProviderFor(organizationId: string): Promise<
   if (!isProduction(env)) chain.push(new MockTranscriber());
   if (!chain.length) throw badRequest('Voice notes are transcribed with Meta Muse Voice Transcribe (or Google Gemini). Add one of these keys in Settings → AI models.');
   return new FailoverTranscriber(chain, (from, reason) => logger.warn({ organizationId, from, reason }, 'Transcription provider failed, trying the next one'));
+}
+
+/** Product cutouts use Meta SAM 3.1; the offline stand-in outside production. */
+export async function segmentationProviderFor(organizationId: string): Promise<SegmentationProvider> {
+  const { db, env } = getInfra();
+  const row = await db.organizationAiSettings.findUnique({ where: { organizationId } });
+  const key = keyForProvider(organizationId, row, 'meta');
+  if (key) return new MetaSegmenter({ apiKey: key });
+  if (!isProduction(env)) return new MockSegmenter();
+  throw badRequest('Product cutouts use Meta SAM 3.1. Add a Meta Model API key in Settings → AI models (as the main or a backup provider).');
 }

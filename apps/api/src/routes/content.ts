@@ -143,6 +143,16 @@ export async function contentRoutes(app: FastifyInstance) {
     return reply.status(201).send(await core.uploadMedia(ctx, { clientId, fileName: file.filename, declaredMime: file.mimetype, data, purpose }));
   });
 
+  // ── Product photo studio: SAM 3.1 cutout, studio shot, Muse Image scene ──
+  app.post('/studio/cutout', { config: { rateLimit: { max: 20, timeWindow: '1 minute' } }, schema: { tags: ['media'] } }, async (req, reply) => {
+    const body = parse(z.object({ mediaId: z.string().min(1).max(64), product: z.string().trim().min(1).max(80), background: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional() }), req.body);
+    return reply.status(201).send(await core.cutOutProduct(await requireCtx(req), body));
+  });
+  app.post('/studio/scene', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } }, schema: { tags: ['media'] } }, async (req, reply) => {
+    const body = parse(z.object({ cutoutMediaId: z.string().min(1).max(64), product: z.string().trim().max(80).default(''), scene: z.string().trim().min(3).max(500) }), req.body);
+    return reply.status(201).send(await core.createProductScene(await requireCtx(req), body));
+  });
+
   app.get('/media', { schema: { tags: ['media'] } }, async (req) => {
     const q = parse(z.object({ clientId: z.string().min(1), kind: z.enum(['IMAGE', 'VIDEO', 'DOCUMENT']).optional() }), req.query);
     return core.listMedia(await requireCtx(req), q.clientId, q.kind);
