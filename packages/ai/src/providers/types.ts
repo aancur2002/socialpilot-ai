@@ -62,6 +62,8 @@ export interface ToolCall {
   name: string;
   /** JSON-encoded arguments, exactly as the model produced them */
   arguments: string;
+  /** Provider-specific data that must be sent back unchanged (e.g. Gemini's thought signature). */
+  extra?: Record<string, unknown>;
 }
 
 export type AgentMessage =

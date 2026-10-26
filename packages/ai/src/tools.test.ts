@@ -33,6 +33,21 @@ describe('tool calling (OpenAI-compatible)', () => {
     expect(body.reasoning_effort).toBe('low');
   });
 
+  it("returns Gemini's thought signature with the tool call on the next turn", async () => {
+    const bodies: Record<string, unknown>[] = [];
+    const sig = { google: { thought_signature: 'sig-abc' } };
+    const fetchImpl = (async (_u: string | URL | Request, init?: RequestInit) => {
+      bodies.push(JSON.parse(String(init?.body)));
+      return new Response(JSON.stringify({ model: 'gemini', choices: [{ finish_reason: 'tool_calls', message: { content: null, tool_calls: [{ id: 'g1', type: 'function', function: { name: 'get_business_profile', arguments: '{}' }, extra_content: sig }] } }] }), { status: 200 });
+    }) as typeof fetch;
+    const p = new OpenAIProvider({ apiKey: 'k', kind: 'google', fetchImpl });
+    const first = await p.chatWithTools({ messages: [{ role: 'system', content: 's' }, { role: 'user', content: 'u' }], tools: CAMPAIGN_TOOLS });
+    expect(first.toolCalls[0]!.extra).toEqual(sig);
+    await p.chatWithTools({ messages: [{ role: 'system', content: 's' }, { role: 'user', content: 'u' }, { role: 'assistant', content: null, toolCalls: first.toolCalls }, { role: 'tool', toolCallId: 'g1', name: 'get_business_profile', content: '{}' }], tools: CAMPAIGN_TOOLS });
+    const echoed = (bodies[1]!.messages as { tool_calls?: { extra_content?: unknown }[] }[])[2]!.tool_calls![0]!;
+    expect(echoed.extra_content).toEqual(sig);
+  });
+
   it('fails over past a provider without tool calling, without blocking its other calls', async () => {
     const noTools: AIProvider = { name: 'notools', modelFor: () => 'x', generateText: async () => ({ text: 'ok', model: 'x', usage: {} }), generateStructured: async () => { throw new Error('unused'); } };
     const chain = new FailoverAIProvider([noTools, new MockAIProvider()]);

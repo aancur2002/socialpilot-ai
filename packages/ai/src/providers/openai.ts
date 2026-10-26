@@ -167,7 +167,7 @@ async function compatibleFetchOnce<T>(fetchImpl: FetchImpl, label: string, baseU
 interface ChatCompletion {
   model: string;
   choices: {
-    message: { content: string | null; refusal?: string | null; tool_calls?: { id: string; type: string; function: { name: string; arguments: string } }[] };
+    message: { content: string | null; refusal?: string | null; tool_calls?: { id: string; type: string; function: { name: string; arguments: string }; extra_content?: Record<string, unknown> }[] };
     finish_reason: string;
   }[];
   usage?: { prompt_tokens: number; completion_tokens: number };
@@ -240,7 +240,7 @@ export class OpenAIProvider implements AIProvider {
       ...(this.preset.reasoningEffort ? { reasoning_effort: tier === 'fast' ? 'minimal' : (input.effort ?? 'low') } : {}),
       messages: input.messages.map((m) =>
         m.role === 'assistant'
-          ? { role: 'assistant', content: m.content, ...(m.toolCalls?.length ? { tool_calls: m.toolCalls.map((c) => ({ id: c.id, type: 'function', function: { name: c.name, arguments: c.arguments } })) } : {}) }
+          ? { role: 'assistant', content: m.content, ...(m.toolCalls?.length ? { tool_calls: m.toolCalls.map((c) => ({ id: c.id, type: 'function', function: { name: c.name, arguments: c.arguments }, ...(c.extra ? { extra_content: c.extra } : {}) })) } : {}) }
           : m.role === 'tool'
             ? { role: 'tool', tool_call_id: m.toolCallId, content: m.content }
             : { role: m.role, content: m.content },
@@ -254,7 +254,8 @@ export class OpenAIProvider implements AIProvider {
     if (choice.finish_reason === 'length' && !choice.message.tool_calls?.length) throw new AiProviderError('Model output was truncated', true, 'truncated');
     return {
       text: choice.message.content ?? null,
-      toolCalls: (choice.message.tool_calls ?? []).filter((c) => c.function?.name).map((c, i) => ({ id: c.id || `call_${i}`, name: c.function.name, arguments: c.function.arguments || '{}' })),
+      // Gemini 3 returns a thought signature per tool call (extra_content) and requires it back on the next turn.
+      toolCalls: (choice.message.tool_calls ?? []).filter((c) => c.function?.name).map((c, i) => ({ id: c.id || `call_${i}`, name: c.function.name, arguments: c.function.arguments || '{}', ...(c.extra_content ? { extra: c.extra_content } : {}) })),
       model: res.model ?? model,
       usage: { inputTokens: res.usage?.prompt_tokens, outputTokens: res.usage?.completion_tokens },
     };
