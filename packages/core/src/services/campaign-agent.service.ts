@@ -20,7 +20,7 @@ import { assertAiQuota, incrementUsage, resolveAuthContext } from './organizatio
  */
 
 const MAX_TURNS = 24;
-const MAX_CALLS_PER_TURN = 4;
+const MAX_CALLS_PER_TURN = 8;
 const POSTABLE: Platform[] = ['FACEBOOK', 'INSTAGRAM', 'LINKEDIN', 'TIKTOK'];
 
 export interface AgentStep {

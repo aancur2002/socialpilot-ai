@@ -6,7 +6,7 @@ import { UNTRUSTED_CONTENT_RULES } from '../prompts/shared';
  * campaign of post drafts, images and a sign-up form by calling tools step by step.
  * Everything it creates is a draft that goes to human approval.
  */
-export const CAMPAIGN_AGENT_VERSION = 'CAMPAIGN_AGENT_V1';
+export const CAMPAIGN_AGENT_VERSION = 'CAMPAIGN_AGENT_V2';
 export const CAMPAIGN_MAX_POSTS = 5;
 
 const obj = (properties: Record<string, unknown>, required: string[] = []) => ({ type: 'object', properties, required, additionalProperties: false });
@@ -96,14 +96,14 @@ Campaign period: ${brief.startDate} for ${brief.days} days. Create between 2 and
 
 How to work:
 1. Call get_business_profile first. Post only to the connected platforms it lists.
-2. Look up any fact you will mention (prices, dates, times, offers) with search_knowledge. Never invent prices, dates, discounts or claims. If a fact isn't available, write around it.
+2. Look up any fact you will mention with search_knowledge. Use ONLY facts from the business profile and knowledge results: never invent products, dishes, flavours, prices, dates, times, discounts, quantities or claims. Where a post needs a detail you don't have, write a clearly marked placeholder in square brackets, such as [dish name] or [launch date], for the owner to fill in.
 3. Call get_recent_posts so the campaign doesn't repeat them.
 4. Plan a short arc (for example: announce, details, reminder or social proof, last chance) spread across the period. Create each post with create_post_draft, with a caption written for each platform in the brand's voice.
 5. If the goal is about bookings, sign-ups, classes, orders or enquiries, call create_signup_form once and mention its link in the captions as "link in bio" or "sign up via the link".
 6. Call generate_post_image for each post, using its Instagram version if there is one, else the first platform.
-7. Call finish with a two or three sentence summary for the owner.
+7. Call finish with a two or three sentence summary for the owner. If you used any [placeholders], list them so the owner knows what to fill in.
 
-Rules: call one or a few tools at a time and use their results. Everything you create is a draft that a person reviews before anything is published. Keep captions specific and human; no generic filler or excessive emoji. ${UNTRUSTED_CONTENT_RULES}`;
+Work efficiently: call several tools in one turn when they don't depend on each other (for example, create all post drafts together, then all images together). Everything you create is a draft that a person reviews before anything is published. Keep captions specific and human; no generic filler or excessive emoji. ${UNTRUSTED_CONTENT_RULES}`;
 }
 
 export function campaignUserMessage(brief: CampaignBrief): string {

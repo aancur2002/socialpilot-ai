@@ -55,6 +55,7 @@ const NAV: { group: string; items: NavItem[] }[] = [
       { href: '/approvals', label: 'Approvals', icon: CheckCircle2, permission: 'content:view' },
       { href: '/content', label: 'Content', icon: FileText, permission: 'content:view' },
       { href: '/content/new', label: 'AI content', icon: Sparkles, permission: 'content:create' },
+      { href: '/agent', label: 'Campaign Agent', icon: Bot, permission: 'content:create' },
       { href: '/calendar', label: 'Calendar', icon: CalendarDays, permission: 'content:view' },
       { href: '/leads', label: 'Leads', icon: Users, permission: 'leads:view' },
       { href: '/lead-capture', label: 'Lead capture', icon: FileInput, permission: 'leads:view' },

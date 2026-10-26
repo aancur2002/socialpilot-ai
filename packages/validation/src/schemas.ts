@@ -555,6 +555,7 @@ export const checkoutSchema = z.object({ months: z.number().int().min(1).max(24)
 export const startCampaignRunSchema = z.object({
   clientId: idSchema,
   goal: z.string().trim().min(10, 'Describe the goal in a sentence').max(1000),
-  startDate: z.coerce.date().optional(),
+  /** Calendar day YYYY-MM-DD (time zones don't shift it) */
+  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).transform((d) => new Date(`${d}T00:00:00Z`)).optional(),
   days: z.number().int().min(2).max(30).default(7),
 });
