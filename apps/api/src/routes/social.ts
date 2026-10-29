@@ -75,9 +75,11 @@ export async function socialRoutes(app: FastifyInstance) {
     const file = await req.file();
     if (!file) throw new AppError('BAD_REQUEST', 'Attach the recording in the "audio" field');
     const fields = file.fields as Record<string, { value?: unknown } | undefined>;
-    const socialAccountId = parse(z.string().min(1).max(64), fields.socialAccountId?.value);
-    const fromName = parse(z.string().max(100).optional(), fields.fromName?.value || undefined);
-    const fromId = parse(z.string().max(100).optional(), fields.fromId?.value || undefined);
+    // One object: parse() turns a missing value into {}, so optional fields can't be parsed alone.
+    const { socialAccountId, fromName, fromId } = parse(
+      z.object({ socialAccountId: z.string().min(1).max(64), fromName: z.string().max(100).optional(), fromId: z.string().max(100).optional() }),
+      { socialAccountId: fields.socialAccountId?.value, fromName: fields.fromName?.value || undefined, fromId: fields.fromId?.value || undefined },
+    );
     const data = await file.toBuffer();
     if (file.file.truncated) throw new AppError('BAD_REQUEST', 'The recording exceeds the upload limit');
     return core.simulateVoiceNote(ctx, { socialAccountId, fromName, fromId, fileName: file.filename || 'voice-note.wav', declaredMime: file.mimetype, data });

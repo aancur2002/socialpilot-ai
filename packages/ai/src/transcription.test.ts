@@ -33,7 +33,7 @@ describe('Muse Voice Transcribe', () => {
     }) as typeof fetch;
     const wav = makeWav(2.1);
     const r = await new MetaTranscriber({ apiKey: 'k', fetchImpl }).transcribe({ wav, keywords: ["Bella's Bakery", 'sourdough'], languageBias: ['English'] });
-    expect(r).toEqual({ text: 'Do you have sourdough today?', durationMs: 2100, model: 'muse-voice-transcribe-1.0', provider: 'meta' });
+    expect(r).toEqual({ text: 'Do you have sourdough today?', noSpeech: false, durationMs: 2100, model: 'muse-voice-transcribe-1.0', provider: 'meta' });
     expect(seen).toMatchObject({ url: 'https://api.meta.ai/v1/asr/transcribe', auth: 'Bearer k', audioType: 'audio/wav', audioBytes: wav.length });
     expect(seen!.request).toEqual({ model: 'muse-voice-transcribe-1.0', audioEncoding: 'WAV', mode: 'PUSH_TO_TALK', languageBias: ['English'], keywords: ["Bella's Bakery", 'sourdough'] });
   });
@@ -64,5 +64,17 @@ describe('backup and failover', () => {
     expect(r.provider).toBe('mock');
     expect(r.text).toContain('3 seconds');
     expect(events).toEqual(['meta']);
+  });
+
+  it('reports no speech instead of echoing the name hints, and stops there', async () => {
+    let system = '';
+    const fetchImpl = (async (_u: string | URL | Request, init?: RequestInit) => {
+      system = (JSON.parse(String(init?.body)).messages as { content: string }[])[0]!.content;
+      return new Response(JSON.stringify({ choices: [{ message: { content: '[NO_SPEECH]' } }] }), { status: 200 });
+    }) as typeof fetch;
+    const gemini = new GeminiTranscriber({ apiKey: 'k', fetchImpl });
+    const r = await new FailoverTranscriber([gemini, new MockTranscriber()]).transcribe({ wav: makeWav(1), keywords: ['Bella'] });
+    expect(r).toMatchObject({ text: '', noSpeech: true, provider: 'google' });
+    expect(system).toMatch(/Never output a name that isn't spoken/);
   });
 });

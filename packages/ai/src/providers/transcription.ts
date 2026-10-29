@@ -20,6 +20,8 @@ export interface TranscriptionInput {
 }
 export interface TranscriptionResult {
   text: string;
+  /** The provider heard no speech: a final answer, not a failure to retry elsewhere. */
+  noSpeech?: boolean;
   durationMs?: number;
   model: string;
   provider: string;
@@ -30,6 +32,7 @@ export interface TranscriptionProvider {
 }
 
 export const MUSE_TRANSCRIBE_MODEL = 'muse-voice-transcribe-1.0';
+const NO_SPEECH = '[NO_SPEECH]';
 
 /** Reads a WAV header; null when the buffer isn't a PCM WAV file. */
 export function wavInfo(buf: Buffer): { channels: number; sampleRate: number; bitsPerSample: number; durationMs: number } | null {
@@ -93,7 +96,9 @@ export class MetaTranscriber implements TranscriptionProvider {
       throw new AiProviderError(`Meta Voice Transcribe returned HTTP ${res.status}${detail ? `: ${detail}` : ''}`, res.status === 429 || res.status >= 500, kind);
     }
     const json = (await res.json()) as { transcript?: string; audioDurationMs?: number };
-    return { text: (json.transcript ?? '').trim(), durationMs: json.audioDurationMs, model: MUSE_TRANSCRIBE_MODEL, provider: this.name };
+    const text = (json.transcript ?? '').trim();
+    // A speech recognizer's empty transcript means it heard no speech.
+    return { text, noSpeech: !text, durationMs: json.audioDurationMs, model: MUSE_TRANSCRIBE_MODEL, provider: this.name };
   }
 }
 
@@ -108,16 +113,19 @@ export class GeminiTranscriber implements TranscriptionProvider {
 
   async transcribe(input: TranscriptionInput): Promise<TranscriptionResult> {
     const model = this.config.model ?? COMPATIBLE_PRESETS.google.fastModel;
-    const hint = input.keywords?.length ? ` Names that may be spoken: ${input.keywords.slice(0, 30).join(', ')}.` : '';
+    // Spelling hints only: without the "never output" rule, silence came back as the hint list.
+    const hint = input.keywords?.length ? ` If any of these names are spoken, spell them this way: ${input.keywords.slice(0, 30).join(', ')}. Never output a name that isn't spoken.` : '';
     const res = await compatibleFetch<{ model?: string; choices: { message: { content: string | null } }[] }>(this.fetchImpl, 'Google Gemini', COMPATIBLE_PRESETS.google.baseUrl, this.config.apiKey, '/chat/completions', {
       model,
       max_tokens: 2000,
       messages: [
-        { role: 'system', content: `Transcribe the audio exactly as spoken, in the language spoken. Output only the transcript, with no notes, quotes or labels.${hint}` },
+        { role: 'system', content: `Transcribe the audio exactly as spoken, in the language spoken. Output only the transcript, with no notes, quotes or labels. If there is no clear speech (silence, music or noise), output exactly ${NO_SPEECH}.${hint}` },
         { role: 'user', content: [{ type: 'input_audio', input_audio: { data: input.wav.toString('base64'), format: 'wav' } }] },
       ],
     });
-    return { text: (res.choices[0]?.message.content ?? '').trim(), durationMs: wavInfo(input.wav)?.durationMs, model: res.model ?? model, provider: this.name };
+    const text = (res.choices[0]?.message.content ?? '').trim();
+    const noSpeech = text.toUpperCase().includes(NO_SPEECH);
+    return { text: noSpeech ? '' : text, noSpeech, durationMs: wavInfo(input.wav)?.durationMs, model: res.model ?? model, provider: this.name };
   }
 }
 
@@ -142,7 +150,7 @@ export class FailoverTranscriber implements TranscriptionProvider {
     for (const p of this.chain) {
       try {
         const r = await p.transcribe(input);
-        if (r.text || p === this.chain[this.chain.length - 1]) return r;
+        if (r.text || r.noSpeech || p === this.chain[this.chain.length - 1]) return r;
         last = new AiProviderError(`${p.name} returned an empty transcript`, true, 'server');
       } catch (error) {
         last = error;
