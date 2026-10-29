@@ -179,7 +179,7 @@ describe('account, knowledge editing and AI model settings', () => {
 
     it("runs Meta's open-weight models: Baseten as is, Modal only with its URL", async () => {
       const baseten = await core.updateAiSettings(owner.ctx, { provider: 'baseten', model: null, fastModel: null, apiKey: 'baseten-test-key-1234', fallbacks: [] });
-      expect(baseten.effective).toMatchObject({ provider: 'baseten', model: 'meta-models/muse-spark-open' });
+      expect(baseten.effective).toMatchObject({ provider: 'baseten', model: 'meta-models/muse-spark-open-1026' });
       await expect(core.updateAiSettings(owner.ctx, { provider: 'modal', apiKey: 'modal-test-key-1234', baseUrl: null })).rejects.toMatchObject({ status: 400, message: expect.stringMatching(/Modal deployment/) });
       const modal = await core.updateAiSettings(owner.ctx, { provider: 'modal', apiKey: 'modal-test-key-1234', baseUrl: 'https://demo--socialpilot-glimmer-serve.modal.run/v1' });
       expect(modal.effective).toMatchObject({ provider: 'modal', model: 'muse-glimmer' });

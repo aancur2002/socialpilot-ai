@@ -37,7 +37,7 @@ export const MODEL_SUGGESTIONS = {
   // Meta Model API (Muse Spark). The -contributor versions are discounted.
   meta: ['muse-spark-1.3', 'muse-spark-1.2', 'muse-spark-1.1', 'muse-spark-1.3-contributor', 'muse-spark-1.2-contributor'],
   // Meta's open weights: Muse Spark Open hosted on Baseten, Muse Glimmer on your own Modal deployment.
-  baseten: ['meta-models/muse-spark-open'],
+  baseten: ['meta-models/muse-spark-open-1026'],
   modal: ['muse-glimmer'],
   embeddings: {
     openai: ['text-embedding-3-small'],

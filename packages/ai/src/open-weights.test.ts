@@ -18,7 +18,7 @@ describe("Meta's open-weight models", () => {
     const out = await ai.generateText({ system: 'Be brief.', messages: [{ role: 'user', content: 'Hi' }], maxTokens: 300 });
     expect(out.text).toBe('Hello from open weights');
     expect(calls[0]!.url).toBe('https://inference.baseten.co/v1/chat/completions');
-    expect(calls[0]!.body).toMatchObject({ model: 'meta-models/muse-spark-open', max_tokens: 4096 });
+    expect(calls[0]!.body).toMatchObject({ model: 'meta-models/muse-spark-open-1026', max_tokens: 4096, reasoning_effort: 'low' });
   });
 
   it('calls Muse Glimmer on your own Modal deployment', async () => {

@@ -101,13 +101,16 @@ export const COMPATIBLE_PRESETS: Record<CompatibleProvider, Preset> = {
   baseten: {
     label: 'Baseten',
     baseUrl: 'https://inference.baseten.co/v1',
-    model: 'meta-models/muse-spark-open',
-    fastModel: 'meta-models/muse-spark-open',
+    // The hackathon key works only with this model ID (Baseten's docs show it without -1026).
+    model: 'meta-models/muse-spark-open-1026',
+    fastModel: 'meta-models/muse-spark-open-1026',
     embeddingModel: '',
     maxTokensParam: 'max_tokens',
     structured: 'negotiate',
     embeddingDimensionsParam: false,
     embeddingInputType: false,
+    // Always reasons (into reasoning_content, not content), at xhigh unless told otherwise.
+    reasoningEffort: true,
     minMaxTokens: 4096,
   },
   modal: {
