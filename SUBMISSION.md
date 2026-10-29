@@ -51,7 +51,7 @@ For a small business, an agent that hands over a well-grounded first draft, and 
 
 ## What's next
 
-- Run the voice, photo and image features live once Meta billing is active, and the Campaign Agent on Muse Glimmer for businesses that want to self-host.
+- Run Muse Voice Transcribe, the photo studio (SAM 3.1) and Muse Image live once Meta billing is active, and the Campaign Agent on Muse Glimmer for businesses that want to self-host.
 - Meta App Review so agencies can connect real Pages.
 - A pilot with local agencies in Nepal.
 
@@ -72,20 +72,25 @@ SocialPilot existed before the hackathon. The git tag `hackathon-start` marks th
 
 ## Demo video script (3:00, new features only)
 
-Record at 1920×1080 with the app in light mode. Before recording, run `npm run demo:reset` so the demo data is fresh, and keep Muse Spark Open (Baseten) as the main AI model. Speak slowly; each line fits its time slot.
+This version needs no Meta card: everything shown runs live. The Campaign Agent and the replies run on **Muse Spark Open** (Baseten); voice notes are transcribed by the Gemini backup until Meta billing is active. The photo studio is left out because SAM 3.1 and Muse Image need Meta billing; it's described in the write-up instead.
+
+Before recording:
+- Run `npm run demo:reset` so the demo data is fresh, then `npm run demo`.
+- In Settings → AI models, keep Baseten (Muse Spark Open) as the main model.
+- Open the app at http://localhost:3000 in light mode, at 1920×1080.
+- Practise once. Speak slowly; each line fits its time slot.
 
 | Time | On screen | Say |
 |---|---|---|
 | 0:00–0:15 | Campaign Agent page, empty | "Small businesses in Nepal and everywhere live on Facebook, Instagram and WhatsApp, but nobody has time to plan a campaign. So we built an agent that does it, on Meta's open-weight model, Muse Spark Open." |
 | 0:15–0:30 | Type the goal "Fill our weekend sourdough baking classes this month", choose Bella's Bakery, click Start | "The bakery owner just types a goal. That's it." |
-| 0:30–1:05 | The live timeline filling in step by step | "Watch it work. It reads the business profile, then checks the facts in the bakery's own knowledge base: the price, the address, when classes run. It looks at recent posts so it doesn't repeat them, creates a booking form, then writes four posts, each one for Instagram, Facebook, TikTok and LinkedIn." |
-| 1:05–1:30 | Result cards; point at a yellow [placeholder] | "Every fact comes from the business. Where it doesn't know something, like the exact dates, it doesn't invent it. It leaves a highlighted gap for the owner. Nothing is published until a person approves it." |
-| 1:30–1:40 | The model name on the run (muse-spark-open-1026) | "That whole campaign took about 25 seconds on Muse Spark Open." |
-| 1:40–2:10 | Inbox → Simulate message → Voice note: record "Hi, do you have gluten-free bread on Saturday?", send, open the conversation | "Many customers don't type, they send voice notes. SocialPilot transcribes them with Meta's Muse Voice Transcribe, and the AI answers from the business's facts, just like a typed message." |
-| 2:10–2:45 | Photo studio: pick a product photo, type "cake", click Cut out, then pick the Dashain scene and click Create scene | "And for photos: SAM 3.1 cuts the product out of a quick phone picture. We get a clean studio shot, and Muse Image puts the same cake on a Dashain table, ready to post." |
-| 2:45–3:00 | Campaign Agent page or Approvals | "SocialPilot: Meta's models do the first draft of a small business's marketing, and the owner stays in charge. Built for our world." |
+| 0:30–1:10 | The live timeline filling in step by step | "Watch it work. It reads the business profile, then checks the facts in the bakery's own knowledge base: the price, the address, when classes run. It looks at recent posts so it doesn't repeat them, creates a booking form, then writes four posts, each one for Instagram, Facebook, TikTok and LinkedIn." |
+| 1:10–1:40 | Result cards; point at a yellow [placeholder] | "Every fact comes from the business. Where it doesn't know something, like the exact dates, it doesn't invent it. It leaves a highlighted gap for the owner to fill." |
+| 1:40–1:55 | The model name on the run (muse-spark-open-1026), then Approvals | "The whole campaign took about 25 seconds on Muse Spark Open, and nothing is published until a person approves it here." |
+| 1:55–2:40 | Inbox → Simulate message → Send as Voice note: record "Hi, how much is a sourdough loaf, and do you deliver to Kentish Town?", send, open the conversation | "Many customers don't type, they send voice notes. SocialPilot turns the voice note into text, then Muse Spark Open answers from the bakery's own prices and delivery area, scores how sure it is, and holds the reply for the team to check." |
+| 2:40–3:00 | Campaign Agent page | "SocialPilot: Meta's open models do the first draft of a small business's marketing and customer replies, and the owner stays in charge. Built for our world." |
 
-If Meta billing isn't active when you record, the voice note shows a Gemini transcript and the photo studio shows placeholder images. In that case, shorten those two scenes and give the extra time to the Campaign Agent.
+If the Modal approval arrives and Muse Glimmer is deployed, you can add one line at 1:55: "It also runs on Muse Glimmer on our own GPU."
 
 ---
 
