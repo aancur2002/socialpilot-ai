@@ -41,14 +41,28 @@ export async function buildServer(): Promise<FastifyInstance> {
   });
 
   const PUBLIC_PREFIX = '/api/v1/public/';
-  const allowedOrigins = new Set([env.APP_URL, ...env.CORS_ORIGINS.split(',').map((o) => o.trim()).filter(Boolean)]);
+  const configuredOrigins = new Set([env.APP_URL, ...env.CORS_ORIGINS.split(',').map((o) => o.trim()).filter(Boolean)]);
+  const appPort = new URL(env.APP_URL).port;
+  // Development: the same app opened as 127.0.0.1, ::1 or the PC's home-network IP
+  // (e.g. from a phone) on the app's port counts as our own origin.
+  const LOCAL_HOST = /^(localhost|127(\.\d{1,3}){3}|\[::1\]|10(\.\d{1,3}){3}|192\.168(\.\d{1,3}){2}|172\.(1[6-9]|2\d|3[01])(\.\d{1,3}){2})$/;
+  const isAllowedOrigin = (origin: string) => {
+    if (configuredOrigins.has(origin)) return true;
+    if (isProduction(env)) return false;
+    try {
+      const u = new URL(origin);
+      return u.port === appPort && LOCAL_HOST.test(u.hostname);
+    } catch {
+      return false;
+    }
+  };
 
   await app.register(helmet, { contentSecurityPolicy: false, crossOriginResourcePolicy: { policy: 'cross-origin' } });
   // Public lead endpoints (embedded forms, lead API) are called from customers' own websites:
   // any origin, never with cookies. Everything else: our app only, with cookies.
   await app.register(cors, () => (req: { url?: string }, cb: (err: Error | null, options: Record<string, unknown>) => void) => {
     if (req.url?.startsWith(PUBLIC_PREFIX)) return cb(null, { origin: '*', credentials: false, methods: ['GET', 'POST', 'OPTIONS'], allowedHeaders: ['content-type', 'authorization'] });
-    cb(null, { origin: (origin: string | undefined, done: (e: Error | null, ok: boolean) => void) => done(null, !origin || allowedOrigins.has(origin)), credentials: true });
+    cb(null, { origin: (origin: string | undefined, done: (e: Error | null, ok: boolean) => void) => done(null, !origin || isAllowedOrigin(origin)), credentials: true });
   });
   await app.register(cookie, { secret: env.JWT_SECRET });
   await app.register(multipart, { limits: { fileSize: MAX_UPLOAD_BYTES, files: 1, fields: 10 } });
@@ -89,7 +103,7 @@ export async function buildServer(): Promise<FastifyInstance> {
     if (!req.cookies[SESSION_COOKIE]) return;
     const origin = req.headers.origin ?? (req.headers.referer ? new URL(req.headers.referer).origin : undefined);
     const self = `${req.protocol}://${req.headers.host}`;
-    if (!origin || (!allowedOrigins.has(origin) && origin !== self)) {
+    if (!origin || (!isAllowedOrigin(origin) && origin !== self)) {
       throw new AppError('FORBIDDEN', 'Cross-site request blocked');
     }
   });
