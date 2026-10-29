@@ -61,7 +61,7 @@ const KEY_HELP: Record<string, string> = {
   google: 'Free tier available: create a key at aistudio.google.com (Get API key). Free-tier limits are low and prompts may be used to improve Google’s products, so use it for testing.',
   nvidia: 'Free credits available: sign in at build.nvidia.com, open any model and choose Get API Key (keys start with nvapi-). Good for testing Llama, Nemotron, DeepSeek and more.',
   meta: 'Create a key at dev.meta.ai (Meta Model API). Muse Spark writes posts and replies; Meta has no embedding model, so keep Google or NVIDIA below for knowledge search.',
-  baseten: 'Meta’s open-weight flagship, hosted by Baseten. Create a key at app.baseten.co (Settings → API keys). Keep Google or NVIDIA below for knowledge search.',
+  baseten: 'Meta’s open-weight flagship, hosted by Baseten. Use the key from app.baseten.co (Settings → API keys) or from Baseten’s hackathon email; leave the model blank to use meta-models/muse-spark-open-1026. Keep Google or NVIDIA below for knowledge search.',
   modal: 'Meta’s open-weight Muse Glimmer on your own Modal GPU. Deploy infra/modal/glimmer.py, then enter its URL as the base URL and the key you set in the Modal secret.',
 };
 
@@ -213,6 +213,8 @@ export function AiModelSettings() {
               <Select id="ai-provider" value={f.provider} onChange={(e) => setF({ ...f, provider: e.target.value, model: '', fastModel: '' })}>
                 <option value="">Server default ({PROVIDER_NAMES[d.serverDefaults.provider] ?? d.serverDefaults.provider})</option>
                 <option value="meta">{PROVIDER_NAMES.meta}</option>
+                <option value="baseten">{PROVIDER_NAMES.baseten}</option>
+                <option value="modal">{PROVIDER_NAMES.modal}</option>
                 <option value="anthropic">{PROVIDER_NAMES.anthropic}</option>
                 <option value="openai">{PROVIDER_NAMES.openai}</option>
                 <option value="google">{PROVIDER_NAMES.google} (free tier)</option>
