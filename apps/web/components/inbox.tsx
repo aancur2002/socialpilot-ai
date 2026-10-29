@@ -54,11 +54,21 @@ function VoiceNoteInput({ value, onChange }: { value: Blob | null; onChange: (wa
     setRecording(false);
   };
   const start = async () => {
+    // Browsers offer the microphone only on secure addresses (https, or localhost).
+    if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+      toast.error('Recording needs a secure address. Open the app at http://localhost:3000, or choose an audio file instead.');
+      return;
+    }
     let stream: MediaStream;
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    } catch {
-      toast.error('Microphone access was blocked. Allow it in the browser, or choose an audio file instead.');
+    } catch (e) {
+      const name = e instanceof DOMException ? e.name : '';
+      toast.error(
+        name === 'NotFoundError'
+          ? 'No microphone was found. Plug one in, check it in your system sound settings, or choose an audio file instead.'
+          : 'Microphone access was blocked. Click the microphone icon in the address bar to allow it, or choose an audio file instead.',
+      );
       return;
     }
     const chunks: Blob[] = [];
