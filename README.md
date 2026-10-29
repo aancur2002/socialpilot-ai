@@ -30,9 +30,22 @@ Platforms: Facebook, Instagram, WhatsApp, LinkedIn and TikTok, through official 
 
 ![Dashboard](docs/screenshots/dashboard.png)
 
+## Built during the Meta AI Developer Hackathon (Oct 26 – Nov 4, 2026)
+
+SocialPilot existed before the event. Everything below was built during it; the git tag [`hackathon-start`](https://github.com/aancur2002/socialpilot-ai/tree/hackathon-start) marks the code as it was before, so `git diff hackathon-start` shows exactly what's new.
+
+| Feature | What it does | Meta models |
+|---|---|---|
+| **Campaign Agent** | Give a goal ("fill our weekend baking classes"). The agent reads the business profile, checks facts in the knowledge base, looks at recent posts, plans an arc, writes each post for every connected platform, creates a sign-up form and images, and sends everything for approval. A live timeline shows each tool call. Details it doesn't know become `[placeholders]` for the owner, never invented facts. | **Muse Spark Open** (tool calling), Muse Image |
+| **Voice-note inbox** | Customers' WhatsApp voice notes are transcribed (with the business's product names as recognition hints) and then answered like typed messages: knowledge-based reply, confidence score, lead capture. The team can play the note back and see which model transcribed it. | **Muse Voice Transcribe** (backup: Gemini audio) |
+| **Product photo studio** | From a phone photo, SAM 3.1 cuts out the product you name. The cutout becomes a square studio shot on the brand colour, and Muse Image places the same product in a new scene (a Dashain table, a Himalayan backdrop, a café). | **SAM 3.1**, **Muse Image** edits |
+| **Meta open weights** | Muse Spark Open on Baseten, or Muse Glimmer on your own Modal GPU (`infra/modal/glimmer.py`), as the main model or a backup, so a business can run on open weights. | **Muse Spark Open**, **Muse Glimmer** |
+
+Verified live: the Campaign Agent runs end to end on Muse Spark Open through Baseten (13 tool calls in about 25 seconds). The Muse Voice Transcribe, SAM 3.1 and Muse Image calls follow Meta's documented APIs and are covered by tests with recorded responses; running them live needs Meta Model API billing.
+
 ## Built on Meta's models
 
-Every AI step runs on **Muse Spark** through the Meta Model API (`https://api.meta.ai/v1`):
+Every AI step runs on Meta's models: **Muse Spark** through the Meta Model API (`https://api.meta.ai/v1`), or the open-weight **Muse Spark Open** (Baseten) and **Muse Glimmer** (your own Modal deployment):
 
 | Step | What Muse Spark does | Reasoning effort |
 |---|---|---|
@@ -42,6 +55,9 @@ Every AI step runs on **Muse Spark** through the Meta Model API (`https://api.me
 | Lead extraction | Name, need and contact details from a conversation | minimal |
 | Reports | A plain-language summary of a client's month | medium |
 | Post images | **Muse Image** turns each post's creative brief into a picture sized for the platform | — |
+| Campaigns | The Campaign Agent plans and drafts a whole campaign by calling tools | low |
+| Voice notes | **Muse Voice Transcribe** turns customer voice notes into text | — |
+| Product photos | **SAM 3.1** cuts the product out; **Muse Image** edits place it in a new scene | — |
 
 Structured steps use strict JSON schema output, validated before use. Prompt-injection defences keep customer messages from steering the AI. If Muse Spark is busy or unavailable, up to three backup providers (Google Gemini, NVIDIA NIM, OpenAI, Anthropic) take over automatically. Knowledge search uses Gemini or NVIDIA embeddings, since the Meta Model API has no embedding model.
 
@@ -134,12 +150,12 @@ apps/
   worker/     BullMQ workers: publishing, replies, webhooks, knowledge, analytics, email, reminders
   web/        Next.js app: dashboard, inbox, content, calendar, CRM, lead capture, settings, admin
 packages/
-  ai/         Providers (Meta, Anthropic, OpenAI, Gemini, NVIDIA), failover, agents, injection defences
+  ai/         Providers (Meta, Baseten, Modal, Anthropic, OpenAI, Gemini, NVIDIA), failover, agents, transcription, segmentation
   core/       Tenant-scoped business services shared by the API and worker
   social/     Platform adapters (real and mock), capability matrix
   database/   Prisma schema and migrations (pgvector)
   auth/ config/ validation/ storage/
-infra/        Dockerfile, Caddy, backups
+infra/        Dockerfile, Caddy, backups, Modal deployment for Muse Glimmer
 docs/         Architecture, deployment, security, AI, database, integrations
 tests/        Integration tests
 ```

@@ -1,76 +1,100 @@
-# SocialPilot AI: submission draft
+# SocialPilot AI: hackathon submission
 
-Draft text for the hackathon submission form. Update the parts marked **[check]** once the official rules (Oct 26) and Meta billing are settled.
+Text for the submission form, the demo video script, and the X post. Submit at https://cerebralvalley.ai/e/meta-ai-developer-hackathon/hackathon/submit before **Nov 4, 9 PM ET (Nov 5, 7:45 AM Nepal)**.
+
+## Project name
+
+SocialPilot AI
 
 ## Tagline
 
-Every client's social media, run from one board: Meta's Muse models write the posts and answer the customers on Meta's own platforms, and people stay in charge.
+A small business tells the AI what it wants ("fill our weekend baking classes") and gets a ready-to-approve campaign, written on Meta's open-weight Muse Spark Open.
 
-## Inspiration
+## Track
 
-Small businesses live on Facebook, Instagram and WhatsApp, but most can't afford someone to post every day and answer every comment and DM. The agencies that help them are stretched across dozens of clients. Messages go unanswered, leads go cold, and posts stop. We wanted one person to be able to run social media for many local businesses without the AI ever saying something the business wouldn't.
+Startup
 
 ## What it does
 
-- **Writes posts:** one idea becomes a separate version for each platform in the client's voice, plus an image from **Muse Image** sized for the platform.
-- **Gets approval:** clients or approvers sign off before anything is published; posts go out on schedule.
-- **Answers customers:** every comment and DM lands in one inbox. **Muse Spark** labels the intent, drafts a reply from that business's own knowledge base, and scores its confidence. Depending on the client's rules, the reply is sent, held for a person, or escalated (complaints, refunds and anything uncertain always go to a person).
-- **Captures leads:** buying intent in a chat, a website form or another tool becomes a lead with a follow-up reminder.
-- **Runs as a business:** customer accounts, plans and limits, trials, payments and an admin console.
+Small businesses run on Facebook, Instagram and WhatsApp, but few can afford someone to post every day and answer every message. SocialPilot is a working multi-tenant product that agencies and small businesses use to draft posts, get them approved, publish them, answer customers and capture leads, with people approving what goes out.
+
+During the hackathon we added four features built on Meta's models:
+
+- **Campaign Agent (Muse Spark Open):** the owner types a goal. The agent reads the business profile, checks facts in the business's knowledge base, looks at recent posts, writes a 2–5 post campaign with a version for each platform, creates a booking form and images, and sends it all for approval. A live timeline shows each step. If it doesn't know a detail (a date, a price), it writes a clear [placeholder] instead of inventing it.
+- **Voice-note inbox (Muse Voice Transcribe):** WhatsApp voice notes are transcribed, with the business's product names as recognition hints, and answered like typed messages.
+- **Product photo studio (SAM 3.1 + Muse Image):** from a phone photo, SAM 3.1 cuts out the named product; the app makes a clean studio shot and Muse Image places the product in a new scene, such as a Dashain table or a Himalayan backdrop.
+- **Open weights:** Muse Spark Open on Baseten, or Muse Glimmer on your own Modal GPU, as the main model or a backup.
 
 ## How we built it
 
-- **Meta Model API:** Muse Spark (`muse-spark-1.3`) for every text step: post writing, intent triage, grounded replies, lead extraction and reports. Strict JSON-schema outputs are validated before use; quick classification steps use minimal reasoning effort to save tokens. Muse Image (`muse-image-1.0`) for post images.
-- **Grounding:** knowledge chunks embedded in PostgreSQL with pgvector; only snippets close in relevance to the best match go into the prompt.
-- **Safety:** confidence-based routing, prompt-injection defences (untrusted text isolated in tagged zones, detection, output checks), and automatic failover to backup providers if a model is busy.
-- **Efficiency:** about 25% fewer input tokens on classification and extraction after measuring each step; no AI at all for "thanks" or emoji-only messages; lead extraction runs alongside the reply draft.
-- **Stack:** TypeScript monorepo with Next.js, Fastify, BullMQ workers, PostgreSQL + pgvector, Redis and Prisma; 267 automated tests plus browser tests; GitHub Actions CI; Docker production setup with automatic HTTPS and daily verified backups.
+- **Agent:** an OpenAI-compatible tool-calling loop (up to 24 turns, several tool calls per turn) over seven tools that reuse the product's own services: business profile, knowledge search, recent posts, post drafts, images, sign-up forms, finish. Every result is a draft that waits for human approval. The goal is wrapped as untrusted input, and the prompt allows only facts from the profile and knowledge base.
+- **Muse Spark Open on Baseten:** `meta-models/muse-spark-open-1026` with reasoning effort set per step (low for writing, minimal for quick checks) instead of the default maximum, so a full campaign takes about 25 seconds and about 27,000 tokens. Backups (Gemini, NVIDIA) take over automatically.
+- **Voice:** browser recordings are converted to 16 kHz mono WAV in the browser; WhatsApp audio is downloaded with the account token and converted with ffmpeg, then sent to Muse Voice Transcribe (`/v1/asr/transcribe`) with keyword biasing.
+- **SAM 3.1:** streamed from the Responses API and parsed with Meta's `@meta-sam/parser`; each mask is stretched over its box with smoothing, then composited with sharp into a transparent cutout and a studio shot. Muse Image edits (`/v1/images/edits`) create the scenes.
+- **Muse Glimmer on Modal:** vLLM 0.28 on one H100 with the `muse_glimmer` tool-call and reasoning parsers, scaling to zero when idle.
+- **Stack:** TypeScript monorepo (Next.js, Fastify, BullMQ, PostgreSQL + pgvector, Redis, Prisma), 290+ automated tests, Docker production setup.
 
 ## Challenges
 
-- **Trusting AI with a business's voice:** we made the AI decide less, not more. It drafts, scores its confidence and explains itself; client rules decide what's sent.
-- **Silent knowledge failures:** switching embedding models made the knowledge base quietly unsearchable. We now re-index automatically when the model changes.
-- **Model churn:** providers retire models (several backup models we used were retired in 2026), so the app reads live model lists and fails over automatically.
-- **Cost:** measuring tokens per step showed the format instructions were being sent twice; removing that cut input tokens by about a quarter.
+- **Stopping the agent from inventing facts.** Its first campaigns made up dishes and dates. Now it may only use facts from the profile and knowledge base, and anything missing becomes a highlighted [placeholder] the owner fills in.
+- **Tool calling across providers.** Gemini rejected follow-up turns until we returned its "thought signature" with each tool call; the same loop now works on Muse Spark Open, Gemini and NVIDIA.
+- **Token cost.** The first agent runs used about 58,000 tokens; letting it make several tool calls per turn and setting reasoning effort cut a full campaign to about 27,000.
+- **Paying for APIs from Nepal.** Meta's API needs an international card. Muse Spark Open on Baseten let us run the whole agent on a Meta model anyway, and every feature falls back gracefully when a model isn't available.
 
 ## Accomplishments we're proud of
 
-A working multi-tenant product, not a demo: tenant isolation on every query, encrypted tokens, audit logs, billing, lead capture, and a one-command production deployment, with Meta's models at its core.
+The Campaign Agent runs end to end on Meta's open-weight model: 13 tool calls, 4 posts for 4 platforms, a booking form and images in about 25 seconds, all grounded in the business's own facts and waiting for approval.
 
 ## What we learned
 
-The most useful thing an AI can do for a small business is the first draft, done well, with a clear "I'm not sure" when it isn't. Confidence scores plus human routing earn more trust than full automation.
+For a small business, an agent that hands over a well-grounded first draft, and clearly marks what it doesn't know, is worth more than one that posts on its own.
 
 ## What's next
 
-- **During the hackathon [check rules]:** Muse Voice Transcribe for WhatsApp voice notes, SAM 3.1 to cut products out of client photos, and a Meta open-weights backup model.
-- Meta App Review, so agencies can connect real Pages (the platform adapters follow Meta's documented Graph API; they're tested with simulated accounts today).
-- A pilot with a few local agencies.
+- Run the voice, photo and image features live once Meta billing is active, and the Campaign Agent on Muse Glimmer for businesses that want to self-host.
+- Meta App Review so agencies can connect real Pages.
+- A pilot with local agencies in Nepal.
 
 ## Built with
 
-Meta Model API (Muse Spark, Muse Image), TypeScript, Next.js, React, Fastify, PostgreSQL, pgvector, Redis, BullMQ, Prisma, Docker, Caddy, Playwright, GitHub Actions.
+Meta Model API (Muse Spark, Muse Image, Muse Voice Transcribe, SAM 3.1), Muse Spark Open (Baseten), Muse Glimmer (Modal, vLLM), TypeScript, Next.js, Fastify, PostgreSQL, pgvector, Redis, BullMQ, Prisma, sharp, ffmpeg, Docker.
+
+## New work during the event
+
+SocialPilot existed before the hackathon. The git tag `hackathon-start` marks the code before the event; everything after it is new (see "Built during the Meta AI Developer Hackathon" in the README). The demo video shows only these new features.
 
 ## Links
 
-- Code: https://github.com/aancur2002/socialpilot-ai **[check: make public if the rules require]**
-- Demo video: **[add link]**
+- Code: https://github.com/aancur2002/socialpilot-ai
+- Demo video: **[add the YouTube link]**
 
 ---
 
-## Narration for the demo video
+## Demo video script (3:00, new features only)
 
-Timed to the draft recording (`~/Videos/socialpilot-demo-draft.webm`, 2:25). Re-record with Meta billing active so Muse Spark and Muse Image answer live **[check]**.
+Record at 1920×1080 with the app in light mode. Before recording, run `npm run demo:reset` so the demo data is fresh, and keep Muse Spark Open (Baseten) as the main AI model. Speak slowly; each line fits its time slot.
 
 | Time | On screen | Say |
 |---|---|---|
-| 0:00 | Landing page | "This is SocialPilot. It lets one person run social media for dozens of local businesses, on Meta's own models and Meta's platforms." |
-| 0:14 | Sign-in, dashboard | "Here's an agency's board: three client businesses, what's scheduled, and the messages waiting." |
-| 0:24 | A post with its versions | "From one idea, Muse Spark writes a separate post for each platform in the bakery's voice, and Muse Image creates the picture." |
-| 0:40 | Approvals | "Nothing goes out until the client or an approver signs off." |
-| 0:56 | Calendar | "Approved posts publish on schedule, with retries and no duplicates." |
-| 1:11 | Inbox with a draft | "A customer asks if the bakery delivers to Kentish Town. Muse Spark finds the answer in the business's own facts, drafts a reply, and scores its confidence. Because this client wants to review that kind of question, it waits here for a person." |
-| 1:30 | A lead | "Buying intent becomes a lead automatically, with where it came from and a follow-up reminder." |
-| 1:46 | Lead capture | "Leads also come from a form on the client's website, or from other tools through an API." |
-| 2:02 | AI settings | "Muse Spark is the main model, with backups that take over automatically, so replies keep flowing even if a model is busy." |
-| 2:17 | Landing page | "SocialPilot: the AI writes the first draft, and people stay in charge." |
+| 0:00–0:15 | Campaign Agent page, empty | "Small businesses in Nepal and everywhere live on Facebook, Instagram and WhatsApp, but nobody has time to plan a campaign. So we built an agent that does it, on Meta's open-weight model, Muse Spark Open." |
+| 0:15–0:30 | Type the goal "Fill our weekend sourdough baking classes this month", choose Bella's Bakery, click Start | "The bakery owner just types a goal. That's it." |
+| 0:30–1:05 | The live timeline filling in step by step | "Watch it work. It reads the business profile, then checks the facts in the bakery's own knowledge base: the price, the address, when classes run. It looks at recent posts so it doesn't repeat them, creates a booking form, then writes four posts, each one for Instagram, Facebook, TikTok and LinkedIn." |
+| 1:05–1:30 | Result cards; point at a yellow [placeholder] | "Every fact comes from the business. Where it doesn't know something, like the exact dates, it doesn't invent it. It leaves a highlighted gap for the owner. Nothing is published until a person approves it." |
+| 1:30–1:40 | The model name on the run (muse-spark-open-1026) | "That whole campaign took about 25 seconds on Muse Spark Open." |
+| 1:40–2:10 | Inbox → Simulate message → Voice note: record "Hi, do you have gluten-free bread on Saturday?", send, open the conversation | "Many customers don't type, they send voice notes. SocialPilot transcribes them with Meta's Muse Voice Transcribe, and the AI answers from the business's facts, just like a typed message." |
+| 2:10–2:45 | Photo studio: pick a product photo, type "cake", click Cut out, then pick the Dashain scene and click Create scene | "And for photos: SAM 3.1 cuts the product out of a quick phone picture. We get a clean studio shot, and Muse Image puts the same cake on a Dashain table, ready to post." |
+| 2:45–3:00 | Campaign Agent page or Approvals | "SocialPilot: Meta's models do the first draft of a small business's marketing, and the owner stays in charge. Built for our world." |
+
+If Meta billing isn't active when you record, the voice note shows a Gemini transcript and the photo studio shows placeholder images. In that case, shorten those two scenes and give the extra time to the Campaign Agent.
+
+---
+
+## X post
+
+> Built for my world 🇳🇵 Small businesses here live on Facebook, Instagram & WhatsApp, but nobody has time to plan campaigns.
+>
+> So I built an agent on @Meta's open-weight Muse Spark Open: type a goal, get a full campaign with posts, booking form & images, ready to approve, in 25 seconds.
+>
+> #MetaAIHackathon [video link]
+
+Check the official hashtag and account to tag in the hackathon Discord before posting.
