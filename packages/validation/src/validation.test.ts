@@ -54,5 +54,7 @@ describe('AI settings API keys', () => {
     expect(aiSettingsSchema.safeParse({ fallbacks: [{ provider: 'meta', apiKey: 'Unauthorized.' }] }).success).toBe(false);
     expect(aiSettingsSchema.safeParse({ embeddingApiKey: 'abc def ghi jkl' }).success).toBe(false);
     expect(aiSettingsSchema.safeParse({ fallbacks: [{ provider: 'meta', apiKey: 'muse-spark-1.3-contributor' }] }).success).toBe(false);
+    expect(aiSettingsSchema.safeParse({ fastModel: 'owner@demo.local' }).success).toBe(false);
+    expect(aiSettingsSchema.safeParse({ model: 'meta-models/muse-spark-open-1026', fastModel: 'muse-spark-1.3-contributor' }).success).toBe(true);
   });
 });

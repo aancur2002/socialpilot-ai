@@ -369,7 +369,14 @@ export const updateKnowledgeSourceSchema = z
 // ── AI model settings (per organization) ────────────────────────────────
 export const AI_PROVIDERS = ['anthropic', 'openai', 'google', 'nvidia', 'meta', 'baseten', 'modal', 'mock'] as const;
 export const EMBEDDING_PROVIDERS = ['openai', 'google', 'nvidia', 'mock'] as const;
-const modelId = z.string().trim().min(1).max(120).regex(/^[A-Za-z0-9._:/@-]+$/, 'Model IDs contain letters, numbers, dots, dashes, slashes or colons');
+const modelId = z
+  .string()
+  .trim()
+  .min(1)
+  .max(120)
+  .regex(/^[A-Za-z0-9._:/@-]+$/, 'Model IDs contain letters, numbers, dots, dashes, slashes or colons')
+  // A browser can auto-fill the login email here.
+  .refine((m) => !/^[^@/]+@[^@/]+\.[a-z]{2,}$/i.test(m), 'That’s an email address, not a model name. Leave the box blank to use the default model.');
 /** API keys are one unbroken token: this catches a pasted error message or sentence. */
 const apiKey = z
   .string()

@@ -38,7 +38,7 @@ export function ModelPicker({
 
   return (
     <div className="space-y-1.5">
-      <Input id={id} value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} autoComplete="off" />
+      <Input id={id} name={id} value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} autoComplete="off" data-1p-ignore data-lpignore="true" spellCheck={false} />
       <div className="flex flex-wrap items-center gap-3">
         <button
           type="button"
