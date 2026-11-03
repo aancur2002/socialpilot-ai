@@ -39,9 +39,9 @@ SocialPilot existed before the event. Everything below was built during it; the 
 | **Campaign Agent** | Give a goal ("fill our weekend baking classes"). The agent reads the business profile, checks facts in the knowledge base, looks at recent posts, plans an arc, writes each post for every connected platform, creates a sign-up form and images, and sends everything for approval. A live timeline shows each tool call. Details it doesn't know become `[placeholders]` for the owner, never invented facts. | **Muse Spark Open** (tool calling), Muse Image |
 | **Voice-note inbox** | Customers' WhatsApp voice notes are transcribed (with the business's product names as recognition hints) and then answered like typed messages: knowledge-based reply, confidence score, lead capture. The team can play the note back and see which model transcribed it. | **Muse Voice Transcribe** (backup: Gemini audio) |
 | **Product photo studio** | From a phone photo, SAM 3.1 cuts out the product you name. The cutout becomes a square studio shot on the brand colour, and Muse Image places the same product in a new scene (a Dashain table, a Himalayan backdrop, a café). | **SAM 3.1**, **Muse Image** edits |
-| **Meta open weights** | Muse Spark Open on Baseten, or Muse Glimmer on your own Modal GPU (`infra/modal/glimmer.py`), as the main model or a backup, so a business can run on open weights. | **Muse Spark Open**, **Muse Glimmer** |
+| **Meta open weights** | Muse Spark Open on Baseten as the main model, or Muse Glimmer on your own Modal GPU (`infra/modal/glimmer.py`), with Meta's hosted Muse Spark and NVIDIA as automatic backups. | **Muse Spark Open**, **Muse Glimmer** |
 
-Verified live: the Campaign Agent runs end to end on Muse Spark Open through Baseten (13 tool calls in about 25 seconds). The Muse Voice Transcribe, SAM 3.1 and Muse Image calls follow Meta's documented APIs and are covered by tests with recorded responses; running them live needs Meta Model API billing.
+Verified live on Meta's models (Nov 3, 2026): a Campaign Agent run on Muse Spark Open through Baseten (15 tool calls: profile, three knowledge checks, a booking form, four posts) with a Muse Image photo for each post; a SAM 3.1 product cutout placed by Muse Image on a Dashain table; and voice notes through Muse Voice Transcribe.
 
 ## Built on Meta's models
 
