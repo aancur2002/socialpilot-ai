@@ -370,17 +370,25 @@ export const updateKnowledgeSourceSchema = z
 export const AI_PROVIDERS = ['anthropic', 'openai', 'google', 'nvidia', 'meta', 'baseten', 'modal', 'mock'] as const;
 export const EMBEDDING_PROVIDERS = ['openai', 'google', 'nvidia', 'mock'] as const;
 const modelId = z.string().trim().min(1).max(120).regex(/^[A-Za-z0-9._:/@-]+$/, 'Model IDs contain letters, numbers, dots, dashes, slashes or colons');
+/** API keys are one unbroken token: this catches a pasted error message or sentence. */
+const apiKey = z
+  .string()
+  .trim()
+  .min(8)
+  .max(500)
+  .regex(/^[\x21-\x7e]+$/, 'That doesn’t look like an API key: keys have no spaces. Paste only the key itself.')
+  .refine((k) => !/[.!?]$/.test(k), 'That doesn’t look like an API key: it ends like a sentence. Paste only the key itself.');
 export const aiSettingsSchema = z.object({
   /** null = use the server default */
   provider: z.enum(AI_PROVIDERS).nullable().optional(),
   model: modelId.nullable().optional(),
   fastModel: modelId.nullable().optional(),
   /** undefined = keep the stored key, null = remove it, string = replace it */
-  apiKey: z.string().trim().min(8).max(500).nullable().optional(),
+  apiKey: apiKey.nullable().optional(),
   baseUrl: z.url().max(300).nullable().optional().or(z.literal('')),
   embeddingProvider: z.enum(EMBEDDING_PROVIDERS).nullable().optional(),
   embeddingModel: modelId.nullable().optional(),
-  embeddingApiKey: z.string().trim().min(8).max(500).nullable().optional(),
+  embeddingApiKey: apiKey.nullable().optional(),
   /**
    * Backup text providers, tried in order when the primary fails. The whole list is
    * replaced; per row, apiKey undefined keeps that provider's saved key, null removes it.
@@ -391,7 +399,7 @@ export const aiSettingsSchema = z.object({
         provider: z.enum(AI_PROVIDERS),
         model: modelId.nullable().optional(),
         fastModel: modelId.nullable().optional(),
-        apiKey: z.string().trim().min(8).max(500).nullable().optional(),
+        apiKey: apiKey.nullable().optional(),
       }),
     )
     .max(3)

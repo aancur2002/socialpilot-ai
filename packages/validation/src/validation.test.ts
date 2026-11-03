@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { CONTENT_STATUSES, INTENTS, LEAD_STATUSES, PLATFORMS, ROLE_KEYS } from './enums';
-import { automationActionsSchema, businessHoursSchema, clientSettingsSchema, registerSchema, startOAuthSchema } from './schemas';
+import { aiSettingsSchema, automationActionsSchema, businessHoursSchema, clientSettingsSchema, registerSchema, startOAuthSchema } from './schemas';
 
 const schema = readFileSync(resolve(__dirname, '../../database/prisma/schema.prisma'), 'utf8');
 const prismaEnum = (name: string) => {
@@ -44,5 +44,14 @@ describe('request schemas', () => {
     expect(automationActionsSchema.safeParse([{ type: 'escalate' }, { type: 'notify' }]).success).toBe(true);
     expect(automationActionsSchema.safeParse([{ type: 'delete_everything' }]).success).toBe(false);
     expect(automationActionsSchema.safeParse([]).success).toBe(false);
+  });
+});
+
+describe('AI settings API keys', () => {
+  it('accepts real-looking keys and refuses pasted sentences', () => {
+    expect(aiSettingsSchema.safeParse({ apiKey: 'sk-abc123_DEF.456' }).success).toBe(true);
+    expect(aiSettingsSchema.safeParse({ apiKey: 'Baseten API returned HTTP 401: Authentication required.' }).success).toBe(false);
+    expect(aiSettingsSchema.safeParse({ fallbacks: [{ provider: 'meta', apiKey: 'Unauthorized.' }] }).success).toBe(false);
+    expect(aiSettingsSchema.safeParse({ embeddingApiKey: 'abc def ghi jkl' }).success).toBe(false);
   });
 });
