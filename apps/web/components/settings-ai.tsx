@@ -75,7 +75,7 @@ const EMBEDDING_NAMES: Record<string, string> = {
 function KeyField({ id, label, status, value, onChange, remove, onRemove }: { id: string; label: string; status: { set: boolean; hint: string | null }; value: string; onChange: (v: string) => void; remove: boolean; onRemove: (v: boolean) => void }) {
   return (
     <Field label={label} htmlFor={id} hint={status.set ? `A key ending ${status.hint} is saved. Leave blank to keep it.` : 'Leave blank to use the server key from .env, if it matches this provider.'}>
-      <Input id={id} type="password" autoComplete="off" placeholder={status.set ? `Saved (${status.hint})` : 'Paste an API key'} value={value} disabled={remove} onChange={(e) => onChange(e.target.value)} />
+      <Input id={id} name={id} type="password" autoComplete="new-password" data-1p-ignore data-lpignore="true" spellCheck={false} placeholder={status.set ? `Saved (${status.hint})` : 'Paste an API key'} value={value} disabled={remove} onChange={(e) => onChange(e.target.value)} />
       {status.set && (
         <label className="mt-1.5 flex items-center gap-2 text-xs text-ink-2">
           <input type="checkbox" checked={remove} onChange={(e) => onRemove(e.target.checked)} /> Remove the saved key
