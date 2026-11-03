@@ -379,6 +379,9 @@ async function modelHint(provider: AIProvider): Promise<string> {
   }
 }
 
+/** Per provider in the connection test, so a busy provider can't time out the whole page. */
+const TEST_TIMEOUT_MS = 15_000;
+
 type ChainTestResult = { provider: string; role: 'primary' | 'backup'; ok: boolean; model?: string; latencyMs?: number; error?: string };
 
 /**
@@ -404,24 +407,26 @@ export async function testAiSettings(ctx: AuthContext, input: AiSettingsInput) {
       build: () => createAIProvider({ provider: f.provider, apiKey: f.apiKey, model: f.model, fastModel: f.fastModel, openaiBaseUrl: customUrl(f.provider) ? resolved.baseUrl : undefined, embeddingProvider: 'mock' }),
     })),
   ];
-  const chain: ChainTestResult[] = [];
-  for (const entry of entries) {
-    if (entry.missingKey) {
-      chain.push({ provider: entry.provider, role: entry.role, ok: false, error: `Add an API key for ${entry.provider}` });
-      continue;
-    }
-    const started = Date.now();
-    let provider: AIProvider | undefined;
-    try {
-      provider = entry.build();
-      const res = await provider.generateText({ system: 'You are a connection test. Reply with the single word OK.', messages: [{ role: 'user', content: 'Connection test' }], maxTokens: 256, effort: 'low' });
-      chain.push({ provider: entry.provider, role: entry.role, ok: true, model: res.model, latencyMs: Date.now() - started });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      const notFound = /HTTP 404|not found|does not exist|unknown model/i.test(message);
-      chain.push({ provider: entry.provider, role: entry.role, ok: false, model: provider?.modelFor('default'), error: notFound && provider ? `${message}.${await modelHint(provider)}`.replace('..', '.') : message });
-    }
-  }
+  // All providers at once: one slow provider shouldn't hold up the others (or time out the page).
+  const chainTest = Promise.all(
+    entries.map(async (entry): Promise<ChainTestResult> => {
+      if (entry.missingKey) return { provider: entry.provider, role: entry.role, ok: false, error: `Add an API key for ${entry.provider}` };
+      const started = Date.now();
+      let provider: AIProvider | undefined;
+      try {
+        provider = entry.build();
+        const res = await Promise.race([
+          provider.generateText({ system: 'You are a connection test. Reply with the single word OK.', messages: [{ role: 'user', content: 'Connection test' }], maxTokens: 256, effort: 'low' }),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`No answer within ${TEST_TIMEOUT_MS / 1000} seconds; the service may be busy, try again later`)), TEST_TIMEOUT_MS).unref()),
+        ]);
+        return { provider: entry.provider, role: entry.role, ok: true, model: res.model, latencyMs: Date.now() - started };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        const notFound = /HTTP 404|not found|does not exist|unknown model/i.test(message);
+        return { provider: entry.provider, role: entry.role, ok: false, model: provider?.modelFor('default'), error: notFound && provider ? `${message}.${await modelHint(provider)}`.replace('..', '.') : message };
+      }
+    }),
+  );
 
   let embeddings: { ok: boolean; model?: string; dimensions?: number; latencyMs?: number; error?: string };
   if (resolved.embeddingProvider !== 'mock' && !resolved.embeddingApiKey) {
@@ -438,6 +443,7 @@ export async function testAiSettings(ctx: AuthContext, input: AiSettingsInput) {
       embeddings = { ok: false, model, error: error instanceof Error ? error.message : String(error) };
     }
   }
+  const chain = await chainTest;
   const primary = chain[0]!;
   return { text: { ok: primary.ok, model: primary.model, latencyMs: primary.latencyMs, error: primary.error }, chain, embeddings };
 }
