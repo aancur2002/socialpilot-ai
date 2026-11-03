@@ -67,6 +67,19 @@ export async function alphaFromObjects(width: number, height: number, objects: S
   return alpha;
 }
 
+/**
+ * The product in front: the largest match plus any match touching it (a cut slice
+ * beside a loaf), so other copies in the background don't float in the cutout.
+ */
+export function mainProduct(objects: SegmentedObject[], imageSide: number): SegmentedObject[] {
+  const area = (o: SegmentedObject) => (o.bounds.right - o.bounds.left) * (o.bounds.bottom - o.bounds.top);
+  const main = objects.reduce((a, o) => (area(o) > area(a) ? o : a), objects[0]!);
+  const gap = imageSide * 0.02;
+  const touches = (o: SegmentedObject) =>
+    o.bounds.left <= main.bounds.right + gap && o.bounds.right >= main.bounds.left - gap && o.bounds.top <= main.bounds.bottom + gap && o.bounds.bottom >= main.bounds.top - gap;
+  return objects.filter((o) => o === main || touches(o));
+}
+
 /** The cutout centred on a square background with a soft drop shadow. */
 export async function studioShot(cutout: Buffer, background: string, size = STUDIO_SIZE): Promise<Buffer> {
   const box = Math.round(size * 0.78);
@@ -110,9 +123,10 @@ export async function cutOutProduct(ctx: AuthContext, input: { mediaId: string; 
   await incrementUsage(ctx.organizationId, 'aiGenerations');
   if (!result.objects.length) throw badRequest(`SAM 3.1 didn't find "${product}" in this photo. Try a simpler name, like "cake" or "bottle".`);
 
-  const alpha = await alphaFromObjects(width, height, result.objects);
-  // Crop to the matches with a little room around them.
-  const b = result.objects.reduce((acc, o) => ({ left: Math.min(acc.left, o.bounds.left), top: Math.min(acc.top, o.bounds.top), right: Math.max(acc.right, o.bounds.right), bottom: Math.max(acc.bottom, o.bounds.bottom) }), { left: width, top: height, right: 0, bottom: 0 });
+  const objects = mainProduct(result.objects, Math.max(width, height));
+  const alpha = await alphaFromObjects(width, height, objects);
+  // Crop to the kept matches with a little room around them.
+  const b = objects.reduce((acc, o) => ({ left: Math.min(acc.left, o.bounds.left), top: Math.min(acc.top, o.bounds.top), right: Math.max(acc.right, o.bounds.right), bottom: Math.max(acc.bottom, o.bounds.bottom) }), { left: width, top: height, right: 0, bottom: 0 });
   const margin = Math.round(Math.max(width, height) * 0.02);
   const crop = { left: Math.max(0, Math.floor(b.left) - margin), top: Math.max(0, Math.floor(b.top) - margin) };
   const extract = { ...crop, width: Math.min(width, Math.ceil(b.right) + margin) - crop.left, height: Math.min(height, Math.ceil(b.bottom) + margin) - crop.top };
@@ -123,8 +137,8 @@ export async function cutOutProduct(ctx: AuthContext, input: { mediaId: string; 
   const stem = media.fileName.replace(/\.[a-z0-9]+$/i, '').slice(0, 60) || 'product';
   const cutoutMedia = await uploadMedia(ctx, { clientId: client.id, fileName: `${stem}-cutout.png`, declaredMime: 'image/png', data: cutout });
   const studioMedia = await uploadMedia(ctx, { clientId: client.id, fileName: `${stem}-studio.png`, declaredMime: 'image/png', data: studio });
-  await audit(ctx, { action: 'media.product_cutout', resourceType: 'MediaAsset', resourceId: cutoutMedia.id, clientId: client.id, after: { source: media.id, product, matches: result.objects.length, model: result.model, provider: segmenter.name } });
-  return { cutout: cutoutMedia, studio: studioMedia, matches: result.objects.length, model: result.model, provider: segmenter.name };
+  await audit(ctx, { action: 'media.product_cutout', resourceType: 'MediaAsset', resourceId: cutoutMedia.id, clientId: client.id, after: { source: media.id, product, matches: result.objects.length, kept: objects.length, model: result.model, provider: segmenter.name } });
+  return { cutout: cutoutMedia, studio: studioMedia, matches: objects.length, model: result.model, provider: segmenter.name };
 }
 
 /** Step 2: Muse Image puts the cut-out product in a new scene, keeping the product as it is. */

@@ -377,7 +377,8 @@ const apiKey = z
   .min(8)
   .max(500)
   .regex(/^[\x21-\x7e]+$/, 'That doesn’t look like an API key: keys have no spaces. Paste only the key itself.')
-  .refine((k) => !/[.!?]$/.test(k), 'That doesn’t look like an API key: it ends like a sentence. Paste only the key itself.');
+  .refine((k) => !/[.!?]$/.test(k), 'That doesn’t look like an API key: it ends like a sentence. Paste only the key itself.')
+  .refine((k) => !/^(muse-|meta-models\/|gemini-|nvidia\/|gpt-|claude-)/i.test(k), 'That’s a model name, not an API key. Put it in the Model box and paste the key here.');
 export const aiSettingsSchema = z.object({
   /** null = use the server default */
   provider: z.enum(AI_PROVIDERS).nullable().optional(),

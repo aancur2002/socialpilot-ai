@@ -53,5 +53,6 @@ describe('AI settings API keys', () => {
     expect(aiSettingsSchema.safeParse({ apiKey: 'Baseten API returned HTTP 401: Authentication required.' }).success).toBe(false);
     expect(aiSettingsSchema.safeParse({ fallbacks: [{ provider: 'meta', apiKey: 'Unauthorized.' }] }).success).toBe(false);
     expect(aiSettingsSchema.safeParse({ embeddingApiKey: 'abc def ghi jkl' }).success).toBe(false);
+    expect(aiSettingsSchema.safeParse({ fallbacks: [{ provider: 'meta', apiKey: 'muse-spark-1.3-contributor' }] }).success).toBe(false);
   });
 });

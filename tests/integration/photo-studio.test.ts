@@ -61,4 +61,12 @@ describe('product photo studio', () => {
     const upload = await core.uploadMedia(owner.ctx, { clientId: setup.client.id, fileName: 'x.jpg', declaredMime: 'image/jpeg', data: await photo() });
     await expect(core.cutOutProduct(other.ctx, { mediaId: upload.id, product: 'cake' })).rejects.toMatchObject({ status: 404 });
   });
+
+  it('keeps the main product and what touches it, not copies in the background', () => {
+    const box = (left: number, top: number, right: number, bottom: number) => ({ bounds: { left, top, right, bottom }, mask: { width: 1, height: 1, data: new Uint8Array([1]) } });
+    const loaf = box(100, 400, 600, 800);
+    const slice = box(590, 600, 800, 820);
+    const farAway = box(80, 20, 200, 120);
+    expect(core.mainProduct([farAway, loaf, slice], 1000)).toEqual([loaf, slice]);
+  });
 });
