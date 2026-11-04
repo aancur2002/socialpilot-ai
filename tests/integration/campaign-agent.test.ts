@@ -36,7 +36,8 @@ describe('Campaign Agent', () => {
       expect(c.scheduledAt.getTime()).toBeGreaterThanOrEqual(new Date('2026-11-02T00:00:00Z').getTime());
       expect(c.scheduledAt.getTime()).toBeLessThan(new Date('2026-11-10T00:00:00Z').getTime());
       expect(c.variants.map((v) => v.platform).sort()).toEqual(['FACEBOOK', 'INSTAGRAM']);
-      expect(c.variants.some((v) => v.media.length === 1)).toBe(true);
+      // One photo per post, on every platform version.
+      expect(c.variants.every((v) => v.media.length === 1)).toBe(true);
     }
     expect(await db.campaign.count({ where: { id: done.campaignId!, organizationId: owner.organizationId } })).toBe(1);
     expect(await db.approval.count({ where: { contentId: { in: (done.contents as { id: string }[]).map((c) => c.id) } } })).toBe(3);

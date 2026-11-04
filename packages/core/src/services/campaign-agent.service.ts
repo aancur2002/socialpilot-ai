@@ -170,6 +170,10 @@ export async function executeCampaignRun(runId: string) {
         if (!variant) throw new Error('This post has no platform versions');
         const image = await generateVariantImage(ctx, contentId, variant.id);
         await upsertVariant(ctx, contentId, { platform: variant.platform, socialAccountId: variant.socialAccountId, caption: variant.caption, hashtags: variant.hashtags, callToAction: variant.callToAction, mediaPrompt: variant.mediaPrompt, mediaIds: [...variant.media.map((m) => m.media.id), image.media.id] }, variant.id);
+        // The other platform versions share this photo: TikTok and Instagram can't publish without one.
+        for (const other of content.variants.filter((v) => v.id !== variant.id && v.media.length === 0)) {
+          await upsertVariant(ctx, contentId, { platform: other.platform, socialAccountId: other.socialAccountId, caption: other.caption, hashtags: other.hashtags, callToAction: other.callToAction, mediaPrompt: other.mediaPrompt, mediaIds: [image.media.id] }, other.id);
+        }
         return { input: { contentId, platform: variant.platform }, output: { ok: true, mediaUrl: image.media.url, model: image.model, provider: image.provider } };
       },
       create_signup_form: async (a) => {
