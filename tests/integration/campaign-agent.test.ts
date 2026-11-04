@@ -65,4 +65,19 @@ describe('Campaign Agent', () => {
     await expect(core.startCampaignRun(owner.ctx, { clientId: setup.client.id, goal: 'Promote our new sourdough loaf this week' })).rejects.toMatchObject({ code: 'PLAN_LIMIT' });
     await db.organization.update({ where: { id: owner.organizationId }, data: { limits: {} } });
   });
+
+  it('a campaign can actually be approved and scheduled on platforms that require a photo', async () => {
+    const other = await createClientWithMock(owner.ctx, ['INSTAGRAM', 'TIKTOK', 'FACEBOOK']);
+    const run = await core.startCampaignRun(owner.ctx, { clientId: other.client.id, goal: 'Launch our new sourdough loaf', startDate: new Date('2030-03-04T00:00:00Z'), days: 7 });
+    expect(await core.executeCampaignRun(run.id)).toMatchObject({ status: 'COMPLETED' });
+    const done = await core.getCampaignRun(owner.ctx, run.id);
+    for (const { id } of done.contents as { id: string }[]) {
+      const c = await core.getContent(owner.ctx, id);
+      expect(c.variants.map((v) => v.platform).sort()).toEqual(['FACEBOOK', 'INSTAGRAM', 'TIKTOK']);
+      for (const v of c.variants) expect(v.media.map((m) => m.media.mimeType)).toEqual(['image/jpeg']);
+      await core.decideApproval(owner.ctx, c.id, { decision: 'APPROVE' });
+      await core.scheduleContent(owner.ctx, c.id, { scheduledAt: new Date('2030-03-05T10:00:00Z') });
+      expect((await core.getContent(owner.ctx, c.id)).status).toBe('SCHEDULED');
+    }
+  });
 });

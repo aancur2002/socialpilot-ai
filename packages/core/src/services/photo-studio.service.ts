@@ -136,7 +136,8 @@ export async function cutOutProduct(ctx: AuthContext, input: { mediaId: string; 
 
   const stem = media.fileName.replace(/\.[a-z0-9]+$/i, '').slice(0, 60) || 'product';
   const cutoutMedia = await uploadMedia(ctx, { clientId: client.id, fileName: `${stem}-cutout.png`, declaredMime: 'image/png', data: cutout });
-  const studioMedia = await uploadMedia(ctx, { clientId: client.id, fileName: `${stem}-studio.png`, declaredMime: 'image/png', data: studio });
+  // Ready to post, so JPEG (Instagram takes nothing else). The cutout stays PNG for its transparency.
+  const studioMedia = await uploadMedia(ctx, { clientId: client.id, fileName: `${stem}-studio.jpg`, declaredMime: 'image/jpeg', data: await sharp(studio).jpeg({ quality: 92 }).toBuffer() });
   await audit(ctx, { action: 'media.product_cutout', resourceType: 'MediaAsset', resourceId: cutoutMedia.id, clientId: client.id, after: { source: media.id, product, matches: result.objects.length, kept: objects.length, model: result.model, provider: segmenter.name } });
   return { cutout: cutoutMedia, studio: studioMedia, matches: objects.length, model: result.model, provider: segmenter.name };
 }
@@ -166,10 +167,10 @@ export async function createProductScene(ctx: AuthContext, input: { cutoutMediaI
     throw new AppError('INTEGRATION_ERROR', `Scene creation failed: ${error instanceof Error ? error.message : 'unknown error'}`);
   }
   await incrementUsage(ctx.organizationId, 'aiGenerations');
-  // Muse Image edits come back as WebP; Instagram and others want PNG or JPEG.
-  const png = await sharp(image.data).png().toBuffer();
+  // Muse Image edits come back as WebP; JPEG is what every publishing platform accepts.
+  const jpeg = await sharp(image.data).jpeg({ quality: 92 }).toBuffer();
   const stem = media.fileName.replace(/-cutout\.png$|\.[a-z0-9]+$/i, '').slice(0, 60) || 'product';
-  const sceneMedia = await uploadMedia(ctx, { clientId: client.id, fileName: `${stem}-scene.png`, declaredMime: 'image/png', data: png });
+  const sceneMedia = await uploadMedia(ctx, { clientId: client.id, fileName: `${stem}-scene.jpg`, declaredMime: 'image/jpeg', data: jpeg });
   await audit(ctx, { action: 'media.product_scene', resourceType: 'MediaAsset', resourceId: sceneMedia.id, clientId: client.id, after: { source: media.id, scene, model: image.model, provider: provider.name } });
   return { media: sceneMedia, model: image.model, provider: provider.name, prompt };
 }

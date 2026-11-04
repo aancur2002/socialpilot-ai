@@ -2,6 +2,7 @@ import { ContentAgent, type BrandContext, type ImageShape } from '@socialpilot/a
 import type { ContentStatus, Platform, Prisma } from '@socialpilot/database';
 import { getPlatformCapabilities, validateContentForPlatform, type MediaRef } from '@socialpilot/social';
 import type { CreateContentInput, GenerateContentInput, VariantInput } from '@socialpilot/validation';
+import sharp from 'sharp';
 import { requirePermission, tenantWhere, type AuthContext, type ServiceContext } from '../context';
 import { AppError, badRequest, notFound } from '../errors';
 import { getInfra } from '../infra';
@@ -563,7 +564,9 @@ export async function generateVariantImage(ctx: AuthContext, contentId: string, 
     throw new AppError('INTEGRATION_ERROR', `Image generation failed: ${error instanceof Error ? error.message : 'unknown error'}`);
   }
   await incrementUsage(ctx.organizationId, 'aiGenerations');
-  const media = await uploadMedia(ctx, { clientId: client.id, fileName: `ai-image-${variant.platform.toLowerCase()}.png`, declaredMime: image.mimeType, data: image.data });
+  // JPEG: the one format every publishing platform accepts (Instagram takes nothing else).
+  const jpeg = await sharp(image.data).jpeg({ quality: 90 }).toBuffer();
+  const media = await uploadMedia(ctx, { clientId: client.id, fileName: `ai-image-${variant.platform.toLowerCase()}.jpg`, declaredMime: 'image/jpeg', data: jpeg });
   await audit(ctx, { action: 'content.image_generated', resourceType: 'MediaAsset', resourceId: media.id, clientId: client.id, after: { contentId, variantId, model: image.model, provider: provider.name } });
   return { media, model: image.model, provider: provider.name, prompt };
 }

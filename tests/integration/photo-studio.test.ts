@@ -27,6 +27,7 @@ describe('product photo studio', () => {
     const result = await core.cutOutProduct(owner.ctx, { mediaId: upload.id, product: 'cake', background: '#fde8d0' });
     expect(result).toMatchObject({ provider: 'mock', matches: 1 });
     expect(result.cutout).toMatchObject({ kind: 'IMAGE', mimeType: 'image/png', fileName: 'cake-cutout.png' });
+    expect(result.studio).toMatchObject({ kind: 'IMAGE', mimeType: 'image/jpeg', fileName: 'cake-studio.jpg' });
     expect((await core.getUsage(owner.organizationId)).aiGenerations).toBe(before + 1);
 
     const cutout = sharp(await storage.get(result.cutout.storageKey));
@@ -42,7 +43,8 @@ describe('product photo studio', () => {
     const studio = await sharp(await storage.get(result.studio.storageKey)).metadata();
     expect([studio.width, studio.height]).toEqual([1080, 1080]);
     const corner = await sharp(await storage.get(result.studio.storageKey)).extract({ left: 0, top: 0, width: 1, height: 1 }).raw().toBuffer();
-    expect([...corner.subarray(0, 3)]).toEqual([0xfd, 0xe8, 0xd0]);
+    // JPEG is lossy: the background colour is close, not exact.
+    [0xfd, 0xe8, 0xd0].forEach((want, i) => expect(Math.abs(corner[i]! - want)).toBeLessThanOrEqual(3));
   });
 
   it('puts the cutout in a new scene and saves it as PNG', async () => {
@@ -51,7 +53,7 @@ describe('product photo studio', () => {
     const scene = await core.createProductScene(owner.ctx, { cutoutMediaId: cutout.id, product: 'handbag', scene: 'on a marble counter in morning light' });
     expect(scene.prompt).toContain('Place this exact handbag on a marble counter in morning light');
     expect(scene.prompt).toMatch(/unchanged/);
-    expect(scene.media).toMatchObject({ kind: 'IMAGE', mimeType: 'image/png', fileName: 'bag-scene.png' });
+    expect(scene.media).toMatchObject({ kind: 'IMAGE', mimeType: 'image/jpeg', fileName: 'bag-scene.jpg' });
   });
 
   it('refuses non-photos and other tenants’ media', async () => {

@@ -21,7 +21,7 @@ const SCENES = [
   'outdoors on a stone ledge with Himalayan mountains softly blurred behind',
   'on a clean pastel backdrop with soft studio lighting',
 ];
-const GENERATED = /-(cutout|studio|scene)\.png$/;
+const GENERATED = /-(cutout|studio|scene)\.(png|jpg)$/;
 const byModel = (provider: string, real: string) => (provider === 'mock' ? 'the offline stand-in' : real);
 
 /** Transparent areas shown as a light checkerboard, the usual cue for a cutout. */

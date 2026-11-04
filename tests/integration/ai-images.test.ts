@@ -30,7 +30,7 @@ describe('AI images and the monthly AI limit', () => {
     expect(result.provider).toBe('mock');
     expect(result.prompt).toContain('A pumpkin loaf on a rustic table');
     expect(result.prompt).toMatch(/No text/);
-    expect(result.media).toMatchObject({ clientId: setup.client.id, kind: 'IMAGE', mimeType: 'image/png', width: 432, height: 768 });
+    expect(result.media).toMatchObject({ clientId: setup.client.id, kind: 'IMAGE', mimeType: 'image/jpeg', width: 432, height: 768 });
     expect((await core.getUsage(owner.organizationId)).aiGenerations).toBe(before + 1);
 
     // The image can be attached to the version like any upload.
