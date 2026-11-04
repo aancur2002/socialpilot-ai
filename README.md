@@ -167,7 +167,7 @@ tests/        Integration tests
 - [How to use SocialPilot](HOW_TO_USE.md): every feature, step by step
 - [Deployment](docs/deployment.md), [Security](docs/security.md), [AI system](docs/ai.md), [Architecture](docs/architecture.md), [Database](docs/database.md)
 - Integrations: [Facebook](docs/integrations/facebook.md), [Instagram](docs/integrations/instagram.md), [WhatsApp](docs/integrations/whatsapp.md), [LinkedIn](docs/integrations/linkedin.md), [TikTok](docs/integrations/tiktok.md)
-- [Hackathon notes](HACKATHON.md), [Build status](BUILD_STATUS.md), [To do](TODO.md)
+- [Build status](BUILD_STATUS.md), [To do](TODO.md)
 
 ## Status
 

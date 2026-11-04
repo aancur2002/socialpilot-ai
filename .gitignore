@@ -27,3 +27,7 @@ blob-report/
 .DS_Store
 *.log
 local.env
+
+# Private hackathon notes (kept locally)
+SUBMISSION.md
+HACKATHON.md
