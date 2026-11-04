@@ -72,7 +72,7 @@ SocialPilot existed before the hackathon. The git tag `hackathon-start` marks th
 ## Links
 
 - Code: https://github.com/aancur2002/socialpilot-ai (public, AGPL-3.0)
-- Demo video: **[add the YouTube link]**
+- Demo video: https://youtu.be/EJSZnahqPD8
 
 ---
 
