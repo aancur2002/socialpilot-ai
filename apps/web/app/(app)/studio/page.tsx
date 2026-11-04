@@ -50,8 +50,8 @@ const resultTitle = (fileName: string) => (fileName.includes('-cutout.') ? 'Cuto
 function Result({ title, media, note, checker }: { title: string; media: MediaAsset; note: string; checker?: boolean }) {
   return (
     <figure className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface">
-      <div className="grid aspect-square place-items-center bg-surface-2" style={checker ? checkerboard : undefined}>
-        <img src={media.url} alt={title} className="max-h-full max-w-full object-contain" />
+      <div className="aspect-square overflow-hidden bg-surface-2" style={checker ? checkerboard : undefined}>
+        <img src={media.url} alt={title} className="h-full w-full object-contain" />
       </div>
       <figcaption className="flex items-center justify-between gap-2 px-3 py-2 text-xs">
         <span>
