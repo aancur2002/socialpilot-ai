@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Copy, ExternalLink, ImagePlus, RefreshCw, Send, Sparkles, Trash2, X } from 'lucide-react';
+import { Copy, ExternalLink, ImagePlus, Images, RefreshCw, Send, Sparkles, Trash2, X } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
@@ -13,12 +13,36 @@ import { api, errorMessage } from '@/lib/api';
 import { useSession } from '@/lib/session';
 import type { Content, MediaAsset, PlatformKey, PlatformStatus, SocialAccount, Variant } from '@/lib/types';
 
+/** Photos already made or uploaded for this client, so a post can reuse one instead of generating again. */
+function PhotoPicker({ clientId, platform, accepted, chosen, onPick, onClose }: { clientId: string; platform: PlatformKey; accepted: string[]; chosen: string[]; onPick: (m: MediaAsset) => void; onClose: () => void }) {
+  const photos = useQuery({ queryKey: ['media', clientId, 'IMAGE'], queryFn: () => api<MediaAsset[]>('/media', { query: { clientId, kind: 'IMAGE' } }) });
+  const list = (photos.data ?? []).filter((m) => !chosen.includes(m.id));
+  return (
+    <Modal open onOpenChange={(o) => !o && onClose()} wide title="Choose a photo" description={`Photos already made or uploaded for this client. Greyed-out photos are in a format ${platformName(platform)} doesn't accept.`}>
+      {photos.isLoading && <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">{[0, 1, 2, 3].map((i) => <Skeleton key={i} className="aspect-square" />)}</div>}
+      {photos.error && <ErrorState error={photos.error} onRetry={() => photos.refetch()} />}
+      {photos.data && !list.length && <p className="py-6 text-center text-sm text-ink-2">No other photos yet. Close this and use Generate image or Add.</p>}
+      <div className="grid max-h-[60vh] grid-cols-3 gap-3 overflow-y-auto sm:grid-cols-4">
+        {list.map((m) => {
+          const ok = !accepted.length || accepted.includes(m.mimeType);
+          return (
+            <button key={m.id} type="button" disabled={!ok} onClick={() => onPick(m)} title={ok ? m.fileName : `${m.mimeType} isn't accepted by ${platformName(platform)}`} aria-label={`Use ${m.fileName}`} className="aspect-square overflow-hidden rounded-[var(--radius-control)] border border-line bg-surface-2 enabled:hover:border-clearance disabled:cursor-not-allowed disabled:opacity-40">
+              <img src={m.url} alt="" className="h-full w-full object-cover" />
+            </button>
+          );
+        })}
+      </div>
+    </Modal>
+  );
+}
+
 function VariantEditor({ content, variant, accounts, caps, editable, onSaved }: { content: Content; variant: Variant; accounts: SocialAccount[]; caps?: PlatformStatus; editable: boolean; onSaved: (c: Content) => void }) {
   const [caption, setCaption] = useState(variant.caption);
   const [hashtags, setHashtags] = useState(variant.hashtags.join(' '));
   const [cta, setCta] = useState(variant.callToAction ?? '');
   const [accountId, setAccountId] = useState(variant.socialAccountId ?? '');
   const [media, setMedia] = useState<MediaAsset[]>(variant.media.map((m) => m.media));
+  const [picking, setPicking] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     setCaption(variant.caption);
@@ -124,6 +148,11 @@ function VariantEditor({ content, variant, accounts, caps, editable, onSaved }: 
               </button>
             )}
             {editable && (
+              <button type="button" className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-[var(--radius-control)] border border-dashed border-line px-1 text-center text-xs text-ink-2 hover:border-ink-3" onClick={() => setPicking(true)}>
+                <Images className="h-5 w-5" /> Choose photo
+              </button>
+            )}
+            {editable && (
               <button
                 className="flex h-20 w-24 flex-col items-center justify-center gap-1 rounded-[var(--radius-control)] border border-dashed border-clearance/50 px-1 text-center text-xs text-clearance hover:bg-clearance-soft disabled:opacity-60"
                 onClick={() => generateImage.mutate()}
@@ -135,6 +164,20 @@ function VariantEditor({ content, variant, accounts, caps, editable, onSaved }: 
             )}
             <input ref={fileRef} type="file" hidden accept="image/jpeg,image/png,image/gif,image/webp,video/mp4,video/quicktime,video/webm" onChange={(e) => e.target.files?.[0] && upload.mutate(e.target.files[0])} />
           </div>
+          {picking && (
+            <PhotoPicker
+              clientId={content.clientId}
+              platform={variant.platform}
+              accepted={caps?.capabilities.supportedImageTypes ?? []}
+              chosen={media.map((m) => m.id)}
+              onPick={(m) => {
+                setMedia((list) => [...list, m]);
+                setPicking(false);
+                toast.success('Photo added. Save the version to keep it.');
+              }}
+              onClose={() => setPicking(false)}
+            />
+          )}
           {caps?.capabilities.requiresMedia && media.length === 0 && <p className="mt-1.5 text-xs text-runway">{platformName(variant.platform)} needs an image or video.</p>}
           {variant.mediaPrompt && <p className="mt-2 text-xs text-ink-2"><span className="font-medium">Creative brief from AI:</span> {variant.mediaPrompt}</p>}
         </div>

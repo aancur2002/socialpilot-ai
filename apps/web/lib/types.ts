@@ -84,6 +84,7 @@ export interface Capabilities {
   webhooks: boolean;
   requiresMedia: boolean;
   maxCaptionLength: number;
+  supportedImageTypes: string[];
   notes: string[];
 }
 
