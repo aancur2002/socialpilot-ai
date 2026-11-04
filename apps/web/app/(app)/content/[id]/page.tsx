@@ -1,12 +1,13 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Copy, ExternalLink, ImagePlus, Images, RefreshCw, Send, Sparkles, Trash2, X } from 'lucide-react';
+import { Copy, ExternalLink, Eye, ImagePlus, Images, RefreshCw, Send, Sparkles, Trash2, X } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { ContentStatusBadge, MockBadge, PlatformChip, platformName, when, humanize } from '@/components/domain';
+import { PostPreview } from '@/components/post-preview';
 import { ConfirmButton, Modal } from '@/components/ui/overlay';
 import { Badge, Button, ErrorState, Field, Input, PageHeader, Panel, PanelHeader, Select, Skeleton, Textarea } from '@/components/ui/primitives';
 import { api, errorMessage } from '@/lib/api';
@@ -43,6 +44,7 @@ function VariantEditor({ content, variant, accounts, caps, editable, onSaved }: 
   const [accountId, setAccountId] = useState(variant.socialAccountId ?? '');
   const [media, setMedia] = useState<MediaAsset[]>(variant.media.map((m) => m.media));
   const [picking, setPicking] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     setCaption(variant.caption);
@@ -100,17 +102,33 @@ function VariantEditor({ content, variant, accounts, caps, editable, onSaved }: 
           <PlatformChip platform={variant.platform} withName />
           <ContentStatusBadge status={variant.status} />
         </div>
+        <div className="flex gap-1">
+          <Button size="sm" variant="ghost" onClick={() => setPreviewing(true)}>
+            <Eye className="h-4 w-4" /> Preview
+          </Button>
         {editable && (
-          <div className="flex gap-1">
+          <>
             <Button size="sm" variant="ghost" loading={regenerate.isPending} onClick={() => regenerate.mutate()}>
               <RefreshCw className="h-4 w-4" /> Rewrite
             </Button>
             <ConfirmButton variant="ghost" title={`Remove the ${platformName(variant.platform)} version?`} description="This platform version will be deleted from the post." confirmLabel="Remove version" onConfirm={async () => onSaved(await api<Content>(`/content/${content.id}/variants/${variant.id}`, { method: 'DELETE' }))}>
               <Trash2 className="h-4 w-4" />
             </ConfirmButton>
-          </div>
+          </>
         )}
+        </div>
       </div>
+      {previewing && (
+        <PostPreview
+          platform={variant.platform}
+          platformLabel={platformName(variant.platform)}
+          name={platformAccounts.find((a) => a.id === accountId)?.displayName ?? 'Your page'}
+          caption={caption}
+          hashtags={tags}
+          media={media}
+          onClose={() => setPreviewing(false)}
+        />
+      )}
       <div className="space-y-4 p-5">
         <Field label="Publish to" htmlFor={`acct-${variant.id}`}>
           <Select id={`acct-${variant.id}`} value={accountId} disabled={!editable} onChange={(e) => setAccountId(e.target.value)}>
