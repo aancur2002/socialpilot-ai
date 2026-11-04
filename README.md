@@ -32,7 +32,7 @@ Platforms: Facebook, Instagram, WhatsApp, LinkedIn and TikTok, through official 
 
 ## Built during the Meta AI Developer Hackathon (Oct 26 – Nov 4, 2026)
 
-**Demo video:** https://youtu.be/EJSZnahqPD8
+**Demo video:** https://youtu.be/rWt1sn--yjk
 
 SocialPilot existed before the event. Everything below was built during it; the git tag [`hackathon-start`](https://github.com/aancur2002/socialpilot-ai/tree/hackathon-start) marks the code as it was before, so `git diff hackathon-start` shows exactly what's new.
 
