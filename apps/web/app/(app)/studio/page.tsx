@@ -15,6 +15,7 @@ interface SceneResult { media: MediaAsset; model: string; provider: string }
 
 const BACKGROUNDS = ['#f4f2ee', '#ffffff', '#fde8d0', '#e3efe6', '#e4ebf5', '#1f2933'];
 const SCENES = [
+  'on a festive Tihar table with marigold garlands, lit diyo lamps and a colourful rangoli',
   'on a marble kitchen counter in soft morning light',
   'on a rustic wooden table in a cosy café',
   'on a festive Dashain table with marigold flowers and diyo lamps',
@@ -106,7 +107,7 @@ export default function PhotoStudioPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Photo studio" description="Turn a quick phone photo of a product into clean post images. SAM 3.1 cuts the product out; Muse Image puts it in a new scene. Results are saved to the media library, ready for posts." />
+      <PageHeader title="Photo studio" description="Turn a quick phone photo of a product into clean post images. SAM 3.1 cuts the product out; Muse Image puts it in a new scene. Download the results you want to use in posts." />
       <div className="grid gap-6 lg:grid-cols-[340px_1fr]">
         <div className="space-y-6">
           <Panel>
@@ -196,7 +197,7 @@ export default function PhotoStudioPage() {
                   <Result key={s.media.id} title="Scene" media={s.media} note={`By ${byModel(s.provider, 'Muse Image')}`} />
                 ))}
               </div>
-              {cut && <p className="border-t border-line px-4 py-3 text-xs text-ink-3">Saved to this client&apos;s media library. Attach them to a post from the post editor.</p>}
+              {cut && <p className="border-t border-line px-4 py-3 text-xs text-ink-3">Download the ones you want now: results show only on this page. To use one in a post, open the post and click Add under Media.</p>}
             </Panel>
           )}
         </div>

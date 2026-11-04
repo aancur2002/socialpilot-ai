@@ -8,7 +8,7 @@ SocialPilot AI
 
 ## Tagline
 
-A small business types a goal ("fill our weekend baking classes") and Meta's models deliver a ready-to-approve campaign: posts for every platform, real photos and a booking form.
+A small business types a goal ("Bhai Tika gift campaign: sisters gifting cashews to their brothers") and Meta's models deliver a ready-to-approve campaign: posts for every platform, real photos and a booking form.
 
 ## Track
 
@@ -26,13 +26,13 @@ During the hackathon we added four features built on Meta's models:
 
 - **Campaign Agent (Muse Spark Open + Muse Image):** the owner types a goal. The agent reads the business profile, checks facts in the business's knowledge base, looks at recent posts, writes a 2–5 post campaign with a version for each platform, creates a booking form, has Muse Image make a photo for each post, and sends everything for approval. A live timeline shows each step. If it doesn't know a detail (a date, a price), it writes a clear [placeholder] instead of inventing it.
 - **Voice-note inbox (Muse Voice Transcribe):** customers' voice notes are transcribed, with the business's product names as recognition hints, and answered like typed messages from the business's own facts. A recording with no speech is flagged for the team, never guessed at.
-- **Product photo studio (SAM 3.1 + Muse Image):** from a phone photo, SAM 3.1 cuts out the named product (just the main product, not copies in the background). The app makes a clean studio shot on the brand colour, and Muse Image places the same product in a new scene, such as a Dashain table with marigolds and diyo lamps.
+- **Product photo studio (SAM 3.1 + Muse Image):** from a phone photo, SAM 3.1 cuts out the named product (just the main product, not copies in the background). The app makes a clean studio shot on the brand colour, and Muse Image places the same product in a new scene, such as a Tihar table with marigolds, diyo lamps and rangoli.
 - **Open weights:** Muse Spark Open (Baseten) is the main model; Muse Glimmer can run on your own GPU (a Modal deployment is included). Meta's hosted Muse Spark and NVIDIA are automatic backups.
 
 ## How we built it
 
 - **Agent:** an OpenAI-compatible tool-calling loop (up to 24 turns, several tool calls per turn) over seven tools that reuse the product's own services: business profile, knowledge search, recent posts, post drafts, images, sign-up forms, finish. Every result is a draft that waits for human approval. The goal is treated as untrusted input, and the prompt allows only facts from the profile and knowledge base.
-- **Muse Spark Open on Baseten:** `meta-models/muse-spark-open-1026`, with reasoning effort set per step (low for writing, minimal for quick checks) instead of the default maximum. A full campaign with 4 posts and 4 photos takes about 90 seconds; the text alone about 25 seconds.
+- **Muse Spark Open on Baseten:** `meta-models/muse-spark-open-1026`, with reasoning effort set per step (low for writing, minimal for quick checks) instead of the default maximum. A full campaign with photos takes about 2–3 minutes; the text alone about 25 seconds.
 - **Muse Image:** `/v1/images/generations` for post photos sized for each platform (saved as JPEG, the one format every publishing platform accepts) and `/v1/images/edits` for studio scenes.
 - **SAM 3.1:** streamed from the Responses API and parsed with Meta's `@meta-sam/parser`. Each mask is stretched over its box with smoothing, the main product is kept (the largest match and what touches it), and sharp composites a transparent cutout and a studio shot with a soft shadow.
 - **Muse Voice Transcribe:** browser recordings are converted to 16 kHz mono WAV in the browser; WhatsApp audio is downloaded with the account token and converted with ffmpeg, then sent to `/v1/asr/transcribe` with keyword biasing.
@@ -49,7 +49,7 @@ During the hackathon we added four features built on Meta's models:
 
 ## Accomplishments we're proud of
 
-A real campaign, end to end on Meta's models: Muse Spark Open read the bakery's profile, checked its facts three times, created a booking form, wrote four posts for four platforms, and Muse Image made four on-brand photos, in 15 tool calls and about 90 seconds, all waiting for the owner's approval. The photo studio turned one picture into a clean product cutout and a Dashain-themed scene with the same loaf.
+A real Tihar campaign for a Nepali food company, Master Chef Food, end to end on Meta's models: Muse Spark Open read the business profile, checked its knowledge base, created a booking form and wrote three Bhai Tika posts for Facebook, Instagram and TikTok with the real price and contact details, and Muse Image made three festive photos, in 12 tool calls and about 2.5 minutes, all waiting for the owner's approval. The photo studio took a jar of dry fruits, cut it out cleanly, and placed the same jar, label intact, on a Tihar table with marigolds, diyos and rangoli.
 
 ## What we learned
 
@@ -83,18 +83,18 @@ Everything shown runs live on Meta's models.
 **Before recording (10 minutes):**
 1. Start the app and open http://localhost:3000 in light mode, at 1920×1080. Log in as owner@demo.local.
 2. Settings → AI models → **Test connection**: all OK.
-3. Have one product photo ready in the Photo studio (the pumpkin sourdough picture is already in Bella's Bakery's media).
-4. Practise once. Speak slowly. Campaigns take about 90 seconds with photos, so **trim the waiting while editing**, or record that part in two takes.
+3. Have the Master Chef jar photo ready to upload in the Photo studio (it is already in Master Chef Food's media).
+4. Practise once. Speak slowly. Campaigns take about 2–3 minutes with photos, so **trim the waiting while editing**, or record that part in two takes.
 
 | Time | On screen | Say |
 |---|---|---|
 | 0:00–0:15 | Campaign Agent page, empty | "Small businesses in Nepal, and everywhere, live on Facebook, Instagram and WhatsApp, but nobody has time to plan a campaign. So we built an agent that does it, on Meta's open-weight model, Muse Spark Open." |
-| 0:15–0:25 | Type "Promote our new pumpkin sourdough this week", choose Bella's Bakery, click Start | "The owner just types a goal." |
-| 0:25–1:00 | The live timeline filling in (cut the waiting) | "It reads the business profile, checks the facts in the bakery's own knowledge base, looks at recent posts so it doesn't repeat them, creates a booking form, and writes four posts, each one for Instagram, Facebook, TikTok and LinkedIn. Then Muse Image makes a photo for every post." |
-| 1:00–1:25 | Result cards with the photos; point at a yellow [placeholder] | "Every fact comes from the business. Where it doesn't know something, it doesn't invent it; it leaves a highlighted gap. Nothing is published until a person approves it." |
-| 1:25–1:55 | Photo studio: pick the pumpkin sourdough photo, type "sourdough loaf", click Cut out | "For product photos, SAM 3.1 cuts the product out of any picture and we get a clean studio shot on the brand colour." |
-| 1:55–2:20 | Choose the Dashain scene, click Create scene, show the result | "And Muse Image puts the same loaf on a Dashain table, with marigolds and diyo lamps, ready for the festival post." |
-| 2:20–2:45 | Inbox → Simulate message → Voice note: record "Hi, how much is a sourdough loaf?", send, open the conversation | "Customers often send voice notes. Muse Voice Transcribe turns them into text, and the AI answers from the bakery's own prices, holding the reply for the team to check." |
+| 0:15–0:25 | Type "Bhai Tika gift campaign: sisters gifting cashews to their brothers this Tihar", choose Master Chef Food, click Start | "The owner just types a goal." |
+| 0:25–1:00 | The live timeline filling in (cut the waiting) | "It reads the business profile, checks the facts in the company's own knowledge base, looks at recent posts so it doesn't repeat them, creates a booking form, and writes three posts, each one for Facebook, Instagram and TikTok. Then Muse Image makes a photo for every post." |
+| 1:00–1:25 | Result cards with the photos; point at the price Rs. 5,000 (and a yellow [placeholder], if one appears) | "The price, phone number and address come from the business. If the AI does not know a detail, it leaves a yellow gap instead of guessing. Nothing is published until a person approves it. In this demo we use practice accounts; posting to real pages needs Meta App Review." |
+| 1:25–1:55 | Photo studio: pick the jar photo, type "jar of dry fruits", click Cut out | "For product photos, SAM 3.1 cuts the product out of any picture and we get a clean studio shot on the brand colour." |
+| 1:55–2:20 | Choose the Tihar scene, click Create scene, show the result | "And Muse Image puts the same jar on a Tihar table, with marigolds, diyo lamps and rangoli, ready for the festival post." |
+| 2:20–2:45 | Inbox → Simulate message → Voice note: record "Hi, how much is one kilo of cashews?", send, open the conversation | "Customers often send voice notes. Muse Voice Transcribe turns them into text, and the AI answers from the company's own prices, holding the reply for the team to check." |
 | 2:45–3:00 | Campaign Agent page | "SocialPilot: four Meta models doing the first draft of a small business's marketing, with the owner in charge. Built for our world." |
 
 ---
