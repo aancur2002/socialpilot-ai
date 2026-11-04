@@ -89,13 +89,13 @@ Everything shown runs live on Meta's models.
 | Time | On screen | Say |
 |---|---|---|
 | 0:00–0:15 | Campaign Agent page, empty | "Small businesses in Nepal, and everywhere, live on Facebook, Instagram and WhatsApp, but nobody has time to plan a campaign. So we built an agent that does it, on Meta's open-weight model, Muse Spark Open." |
-| 0:15–0:25 | Type "Bhai Tika gift campaign: sisters gifting cashews to their brothers this Tihar", choose Master Chef Food, click Start | "The owner just types a goal." |
+| 0:15–0:25 | Type "Bhai Tika gift campaign: sisters gifting cashews to their brothers this Tihar", choose Master Chef Food, set Starts to Nov 5 and Length to 7 days, click Plan the campaign | "The owner just types a goal." |
 | 0:25–1:00 | The live timeline filling in (cut the waiting) | "It reads the business profile, checks the facts in the company's own knowledge base, looks at recent posts so it doesn't repeat them, creates a booking form, and writes three posts, each one for Facebook, Instagram and TikTok. Then Muse Image makes a photo for every post." |
-| 1:00–1:25 | Result cards with the photos; point at the price Rs. 5,000 (and a yellow [placeholder], if one appears) | "The price, phone number and address come from the business. If the AI does not know a detail, it leaves a yellow gap instead of guessing. Nothing is published until a person approves it. In this demo we use practice accounts; posting to real pages needs Meta App Review." |
-| 1:25–1:55 | Photo studio: pick the jar photo, type "jar of dry fruits", click Cut out | "For product photos, SAM 3.1 cuts the product out of any picture and we get a clean studio shot on the brand colour." |
-| 1:55–2:20 | Choose the Tihar scene, click Create scene, show the result | "And Muse Image puts the same jar on a Tihar table, with marigolds, diyo lamps and rangoli, ready for the festival post." |
-| 2:20–2:45 | Inbox → Simulate message → Voice note: record "Hi, how much is one kilo of cashews?", send, open the conversation | "Customers often send voice notes. Muse Voice Transcribe turns them into text, and the AI answers from the company's own prices, holding the reply for the team to check." |
-| 2:45–3:00 | Campaign Agent page | "SocialPilot: four Meta models doing the first draft of a small business's marketing, with the owner in charge. Built for our world." |
+| 1:00–1:40 | Result cards; rest the mouse on the price Rs. 5,000. Open a post, click Preview on the Instagram and TikTok versions | "The price and phone number come from the business. If the AI does not know a detail, it leaves a yellow gap. Before posting, the owner can see a preview for each platform, and nothing is posted until a person approves it. In this demo we use practice accounts; real posting needs Meta App Review." |
+| 1:40–2:05 | Photo studio: pick the jar photo, type "jar of dry fruits", click Cut out | "For product photos, SAM 3.1 cuts the product out of any picture and we get a clean studio shot on the brand colour." |
+| 2:05–2:25 | Choose the Tihar scene, click Create scene, show the result | "And Muse Image puts the same jar on a Tihar table, with marigolds, diyo lamps and rangoli, ready for the festival post." |
+| 2:25–2:48 | Inbox → Simulate message → Voice note: record "Hi, how much is one kilo of cashews?", send, open the conversation | "Customers often send voice notes. Muse Voice Transcribe turns them into text, and the AI answers from the company's own prices, holding the reply for the team to check." |
+| 2:48–3:00 | Campaign Agent page | "SocialPilot: four Meta models doing the first draft of a small business's marketing, with the owner in charge. Built for our world." |
 
 ---
 
