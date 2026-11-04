@@ -28,6 +28,25 @@ const byModel = (provider: string, real: string) => (provider === 'mock' ? 'the 
 /** Transparent areas shown as a light checkerboard, the usual cue for a cutout. */
 const checkerboard = { backgroundImage: 'conic-gradient(var(--color-line) 25%, transparent 0 50%, var(--color-line) 0 75%, transparent 0)', backgroundSize: '20px 20px' };
 
+/** Images live on the API's address, where browsers ignore a link's download attribute and leave the page. */
+async function downloadFile(media: MediaAsset) {
+  try {
+    const res = await fetch(media.url);
+    if (!res.ok) throw new Error(String(res.status));
+    const url = URL.createObjectURL(await res.blob());
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = media.fileName;
+    link.click();
+    URL.revokeObjectURL(url);
+  } catch {
+    // Keep the studio open whatever happens: show the image in a new tab to save from there.
+    window.open(media.url, '_blank', 'noopener');
+  }
+}
+
+const resultTitle = (fileName: string) => (fileName.includes('-cutout.') ? 'Cutout' : fileName.includes('-scene.') ? 'Scene' : 'Studio shot');
+
 function Result({ title, media, note, checker }: { title: string; media: MediaAsset; note: string; checker?: boolean }) {
   return (
     <figure className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface">
@@ -39,9 +58,9 @@ function Result({ title, media, note, checker }: { title: string; media: MediaAs
           <span className="block font-medium text-ink">{title}</span>
           <span className="text-ink-3">{note}</span>
         </span>
-        <a href={media.url} download={media.fileName} className="inline-flex items-center gap-1 text-ink-2 hover:text-ink" aria-label={`Download ${title}`}>
+        <button type="button" onClick={() => void downloadFile(media)} className="inline-flex items-center gap-1 text-ink-2 hover:text-ink" aria-label={`Download ${title}`} title="Download">
           <Download className="h-4 w-4" />
-        </a>
+        </button>
       </figcaption>
     </figure>
   );
@@ -71,6 +90,9 @@ export default function PhotoStudioPage() {
   });
   const sources = (photos.data ?? []).filter((m) => !GENERATED.test(m.fileName)).slice(0, 12);
   const photo = sources.find((m) => m.id === photoId) ?? null;
+  // Everything made earlier stays reachable after leaving or reloading the page.
+  const shownNow = new Set([cut?.cutout.id, cut?.studio.id, ...scenes.map((r) => r.media.id)]);
+  const earlier = (photos.data ?? []).filter((m) => GENERATED.test(m.fileName) && !shownNow.has(m.id)).slice(0, 12);
 
   const upload = useMutation({
     mutationFn: (file: File) => {
@@ -107,7 +129,7 @@ export default function PhotoStudioPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Photo studio" description="Turn a quick phone photo of a product into clean post images. SAM 3.1 cuts the product out; Muse Image puts it in a new scene. Download the results you want to use in posts." />
+      <PageHeader title="Photo studio" description="Turn a quick phone photo of a product into clean post images. SAM 3.1 cuts the product out; Muse Image puts it in a new scene. Your results stay here under Earlier results." />
       <div className="grid gap-6 lg:grid-cols-[340px_1fr]">
         <div className="space-y-6">
           <Panel>
@@ -197,7 +219,17 @@ export default function PhotoStudioPage() {
                   <Result key={s.media.id} title="Scene" media={s.media} note={`By ${byModel(s.provider, 'Muse Image')}`} />
                 ))}
               </div>
-              {cut && <p className="border-t border-line px-4 py-3 text-xs text-ink-3">Download the ones you want now: results show only on this page. To use one in a post, open the post and click Add under Media.</p>}
+              {cut && <p className="border-t border-line px-4 py-3 text-xs text-ink-3">To use a result in a post, download it, open the post and click Add under Media.</p>}
+            </Panel>
+          )}
+          {earlier.length > 0 && (
+            <Panel>
+              <PanelHeader title="Earlier results" />
+              <div className="grid gap-4 p-4 sm:grid-cols-2 xl:grid-cols-3">
+                {earlier.map((m) => (
+                  <Result key={m.id} title={resultTitle(m.fileName)} media={m} note={m.fileName} checker={m.fileName.includes('-cutout.')} />
+                ))}
+              </div>
             </Panel>
           )}
         </div>
